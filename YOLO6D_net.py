@@ -12,7 +12,9 @@ class YOLO6D:
     WEIGHT_DECAY = 0.0001
     MAX_PADDING = 'SAME'
     EPSILON = 1e-10
-    LEARNING_RATE = 0.00
+    learning_rate = None
+    optimizer = None
+    loss = None
 
     def __init__(self, input_size, name, activation_func=tf.nn.relu):
         """
@@ -56,6 +58,10 @@ class YOLO6D:
 
 #    def _loss():
 
+
+    def get_optimizer(self):
+        ##choose an optimizer to train the network
+        self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(self.loss)
 
     def _get_variable(self, name, shape, initializer):
         """
