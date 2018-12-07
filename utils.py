@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-import 
+import config as cfg
 
 def conf_func(x1, x2, name='Confidence func'):
     """

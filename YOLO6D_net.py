@@ -5,6 +5,7 @@ import sys
 import config as cfg
 
 """
+5BTM 51C9 3791 5TKL
 This is the script to try to reproduce YOLO-6D
 input: a mini-batch of images
 train:
@@ -23,6 +24,7 @@ class YOLO6D_net:
     disp = cfg.DISP
     param_num = 0
     boxes_per_cell = cfg.BOXES_PER_CELL
+    image_size = cfg.IMAGE_SIZE
 
     num_class = 0
     Batch_Norm = cfg.BATCH_NORM
@@ -39,7 +41,6 @@ class YOLO6D_net:
         """
         placeholder定义输入
         """
-        self.image_size = 416
         self.input_images = tf.placeholder(tf.float32, [None, self.image_size, self.image_size, 3], name='Input')
         self.logit = self._build_net(self.input_images)
 
@@ -52,13 +53,13 @@ class YOLO6D_net:
             class number: num_class
         ]
         """
-        self.boundry_1 = 9 * 2 * self.boxes_per_cell
+        self.boundry_1 = 9 * 2 * self.boxes_per_cell   ## Seperate coordinates
         self.boundry_2 = self.num_class
         self.labels = tf.placeholder(tf.float32, [None, self.cell_size, self.cell_size, 19 + self.num_class + 1], name='Labels')  #labels should have 1-d tensor to be responsible
         self.off_set = tf.transpose(np.reshape(np.array(
-                                    [np.arange(self.cell_size)] * self.cell_size * self.boxes_per_cell), 
-                                    (1, self.cell_size, self.cell_size)), 
-                                    (1, 2, 0))
+                                    [np.arange(self.cell_size)] * self.cell_size * self.boxes_per_cell),  ## array shape
+                                    (1, self.cell_size, self.cell_size)),   ## reshape array
+                                    (1, 2, 0))   ## transpose array
         self.loss = self.loss_layer(self.logit, self.labels)
         self.total_loss = tf.losses.get_total_loss()
 
@@ -84,7 +85,7 @@ class YOLO6D_net:
         self.x = self.conv(self.x, 1, 1, 256, num=12)
         self.x = self.conv(self.x, 3, 1, 512, num=13)
         self.x_ps = self.conv(self.x, 1, 1, 64, num=14)    #add a pass through layer
-        self.x_ps = self.conv(self.x_ps, 3, 2, 256, num=15)   ##
+        self.x_ps = self.conv(self.x_ps, 3, 2, 256, num=15)   
         self.x = self.max_pool_layer(self.x, name='MaxPool5')    #continue straight layer
         self.x = self.conv(self.x, 3, 1, 1024, num=16)
         self.x = self.conv(self.x, 1, 1, 512, num=17)
@@ -95,10 +96,10 @@ class YOLO6D_net:
         self.x = self.conv(self.x, 3, 1, 1024, num=22)
         self.x = self.merge_layer(self.x, self.x_ps, name='Merge')
         self.x = self.conv(self.x, 3, 1, 1024, num=23)
-        self.x = self.conv(self.x, 1, 1, 19 + self.num_class - 1, num=24)
+        self.x = self.conv(self.x, 1, 1, 18 + self.num_class, num=24)
         return self.x
 
-    def conv(self, x, kernel_size, strides, filters, num, pad='SAME'):
+    def conv(self, x, kernel_size, strides, filters, num, pad='SAME', scope='Conv_layer'):
         """
         Conv ==> ReLU ==> Batch_Norm
         """
@@ -161,10 +162,40 @@ class YOLO6D_net:
         ##choose an optimizer to train the network
         self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(self.loss)
 
+    def calcu_iou(self, boxes1, boxes2, scope='iou'):
+        """
+        calculate 2 boxes' iou
+
+        Args: 
+            box_1: 4-D tensor [cell_size, cell_size, boxes_per_cell, 4] ===> [x_center, y_center, width, height]
+            box_2: 4-D tensor [cell_size, cell_size, boxes_per_cell, 4] ===> [x_center, y_center, width, height]
+        Return: 
+            iou: 3-D tensor [cell_size, cell_size, boxes_per_cell]
+        """
+        with tf.variable_scope(scope):
+            """
+
+            """
+            boxes1 = tf.stack([boxes1[:, :, :, :, 0] - boxes1[:, :, :, :, 2] / 2.0,
+                               boxes1[:, :, :, :, 1] - boxes1[:, :, :, :, 3] / 2.0,
+                               boxes1[:, :, :, :, 0] + boxes1[:, :, :, :, 2] / 2.0,
+                               boxes1[:, :, :, :, 1] + boxes1[:, :, :, :, 3] / 2.0])
+            boxes1 = tf.transpose(boxes1, [1, 2, 3, 4, 0])
+
+            boxes2 = tf.stack([boxes2[:, :, :, :, 0] - boxes2[:, :, :, :, 2] / 2.0,
+                               boxes2[:, :, :, :, 1] - boxes2[:, :, :, :, 3] / 2.0,
+                               boxes2[:, :, :, :, 0] + boxes2[:, :, :, :, 2] / 2.0,
+                               boxes2[:, :, :, :, 1] + boxes2[:, :, :, :, 3] / 2.0])
+            boxes2 = tf.transpose(boxes2, [1, 2, 3, 4, 0])
+
+
     def loss_layer(self, predicts, labels, scope='Loss_layer'):
         """
-        output predict tensor: [batch_size, cell_size, cell_size, 18 + num_class] 18 is 9-points'-coord
-        input  labels tensor:  [batch_size, cell_size, cell_size, 20 + num_class] 20 is 9-points'-coord + 1-response + 1-confidence
+        Args:
+            predict tensor: [batch_size, cell_size, cell_size, 18 + num_class] 18 is 9-points'-coord
+                             last dimension: coord(18) ==> classes(num_class)
+            labels tensor:  [batch_size, cell_size, cell_size, 20 + num_class] 20 is 9-points'-coord + 1-response + 1-confidence
+                             last dimension: response(1) ==> coord(18) ==> classes(num_class) ==> confidence(1)
         """
         self.predict_coord = tf.reshape(predicts[:, :, :, : self.boundry_1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_coord])
         self.predict_classes = tf.reshape(predicts[:, :, :, self.boundry_1:], [self.Batch_Size, self.cell_size, self.cell_size, self.num_class])
@@ -176,10 +207,14 @@ class YOLO6D_net:
 
         self.off_set = tf.constant(self.off_set, dtype=tf.float32)
         self.off_set = tf.reshape(self.off_set, [1, self.cell_size, self.cell_size, self.boxes_per_cell])
-        self.off_set = tf.tile(self.off_set, [self.Batch_Size, 1, 1, 1])
+        self.off_set = tf.tile(self.off_set, [self.Batch_Size, 1, 1, 1])   
+        ## off_set shape : [self.Batch_Size, self.cell_size, self.cell_size, self.boxes_per_cell]
 
-        self.dt_x = dist(self.predict_coord, self.labels_coord)
-        self.predict_conf = confidence_func(self.dt_x)
+        predict_boxes_tran = tf.stack([(self.predict_coord)])
+        #self.dt_x = dist(self.predict_coord, self.labels_coord)
+        #self.predict_conf = confidence_func(self.dt_x)
 
         ## coord loss
-        #self.        
+
+
+        return loss
