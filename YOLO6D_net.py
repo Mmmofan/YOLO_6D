@@ -20,7 +20,7 @@ class YOLO6D_net:
     EPSILON = cfg.EPSILON
     learning_rate = cfg.LEARNING_RATE
     optimizer = None
-    loss = None
+    #loss = None
     disp = cfg.DISP
     param_num = 0
     boxes_per_cell = cfg.BOXES_PER_CELL
@@ -37,32 +37,38 @@ class YOLO6D_net:
     class_scale = cfg.CLASS_SCALE
     coord_scale = cfg.COORD_SCALE
 
-    def __init__(self):
+    def __init__(self, is_training=True):
         """
-        placeholder定义输入
+        Input images: [416 * 416 * 3]
+        output tensor: [13 * 13 * (18 + 1 + num_classes)]
+            self.input_images ==> self.logit
         """
         self.input_images = tf.placeholder(tf.float32, [None, self.image_size, self.image_size, 3], name='Input')
         self.logit = self._build_net(self.input_images)
 
-        """
-        Input labels struct:
-        [
-            responsible: 1
-            9 points coord: 18
-            confidence: 1
-            class number: num_class
-        ]
-        """
         self.boundry_1 = 9 * 2 * self.boxes_per_cell   ## Seperate coordinates
         self.boundry_2 = self.num_class
-        self.labels = tf.placeholder(tf.float32, [None, self.cell_size, self.cell_size, 19 + self.num_class + 1], name='Labels')  #labels should have 1-d tensor to be responsible
+        """
+        off_set:  [self.cell_size, self.cell_size, 18]
+        """
         self.off_set = tf.transpose(np.reshape(np.array(
-                                    [np.arange(self.cell_size)] * self.cell_size * self.boxes_per_cell),  ## array shape
-                                    (1, self.cell_size, self.cell_size)),   ## reshape array
-                                    (1, 2, 0))   ## transpose array
-        self.loss = self.loss_layer(self.logit, self.labels)
-        self.total_loss = tf.losses.get_total_loss()
-
+                                    [np.arange(self.cell_size)] * self.cell_size * 18 * self.boxes_per_cell),
+                                    (1, self.cell_size, self.cell_size)),
+                                    (1, 2, 0))
+        if self.is_training:
+            """
+            Input labels struct:
+            [
+                responsible: 1
+                9 points coord: 18
+                confidence: 1
+                class number: num_class
+            ]
+            """
+            self.labels = tf.placeholder(tf.float32, [None, self.cell_size, self.cell_size, 18 + 1 + self.num_class + 1], name='Labels')
+            self.loss_layer(self.logit, self.labels)
+            self.total_loss = tf.losses.get_total_loss()
+        
 
     def _build_net(self, input_size):
         if self.disp:
@@ -96,7 +102,7 @@ class YOLO6D_net:
         self.x = self.conv(self.x, 3, 1, 1024, num=22)
         self.x = self.merge_layer(self.x, self.x_ps, name='Merge')
         self.x = self.conv(self.x, 3, 1, 1024, num=23)
-        self.x = self.conv(self.x, 1, 1, 18 + self.num_class, num=24)
+        self.x = self.conv(self.x, 1, 1, 18 + 1 + self.num_class, num=24)
         return self.x
 
     def conv(self, x, kernel_size, strides, filters, num, pad='SAME', scope='Conv_layer'):
@@ -162,59 +168,37 @@ class YOLO6D_net:
         ##choose an optimizer to train the network
         self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(self.loss)
 
-    def calcu_iou(self, boxes1, boxes2, scope='iou'):
-        """
-        calculate 2 boxes' iou
-
-        Args: 
-            box_1: 4-D tensor [cell_size, cell_size, boxes_per_cell, 4] ===> [x_center, y_center, width, height]
-            box_2: 4-D tensor [cell_size, cell_size, boxes_per_cell, 4] ===> [x_center, y_center, width, height]
-        Return: 
-            iou: 3-D tensor [cell_size, cell_size, boxes_per_cell]
-        """
-        with tf.variable_scope(scope):
-            """
-
-            """
-            boxes1 = tf.stack([boxes1[:, :, :, :, 0] - boxes1[:, :, :, :, 2] / 2.0,
-                               boxes1[:, :, :, :, 1] - boxes1[:, :, :, :, 3] / 2.0,
-                               boxes1[:, :, :, :, 0] + boxes1[:, :, :, :, 2] / 2.0,
-                               boxes1[:, :, :, :, 1] + boxes1[:, :, :, :, 3] / 2.0])
-            boxes1 = tf.transpose(boxes1, [1, 2, 3, 4, 0])
-
-            boxes2 = tf.stack([boxes2[:, :, :, :, 0] - boxes2[:, :, :, :, 2] / 2.0,
-                               boxes2[:, :, :, :, 1] - boxes2[:, :, :, :, 3] / 2.0,
-                               boxes2[:, :, :, :, 0] + boxes2[:, :, :, :, 2] / 2.0,
-                               boxes2[:, :, :, :, 1] + boxes2[:, :, :, :, 3] / 2.0])
-            boxes2 = tf.transpose(boxes2, [1, 2, 3, 4, 0])
-
-
     def loss_layer(self, predicts, labels, scope='Loss_layer'):
         """
         Args:
-            predict tensor: [batch_size, cell_size, cell_size, 18 + num_class] 18 is 9-points'-coord
-                             last dimension: coord(18) ==> classes(num_class)
+            predict tensor: [batch_size, cell_size, cell_size, 19 + num_class] 19 is 9-points'-coord(18) + 1-confidence
+                             last dimension: coord(18) ==> classes(num_class) ==> confidence(1)
             labels tensor:  [batch_size, cell_size, cell_size, 20 + num_class] 20 is 9-points'-coord + 1-response + 1-confidence
                              last dimension: response(1) ==> coord(18) ==> classes(num_class) ==> confidence(1)
         """
-        self.predict_coord = tf.reshape(predicts[:, :, :, : self.boundry_1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_coord])
-        self.predict_classes = tf.reshape(predicts[:, :, :, self.boundry_1:], [self.Batch_Size, self.cell_size, self.cell_size, self.num_class])
+        predict_coord = tf.reshape(predicts[:, :, :, :self.boundry_1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_coord])
+        predict_classes = tf.reshape(predicts[:, :, :, self.boundry_1:-1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_class])
+        predict_conf = tf.reshape(predicts[:, :, :, -1], [self.Batch_Size, self.cell_size, self.cell_size, 1])
 
-        self.response = tf.reshape(labels[:, :, :, 0], [self.Batch_Size, self.cell_size, self.cell_size, 1])
-        self.labels_coord = tf.reshape(labels[:, :, :, 1:self.boundry_1+1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_coord])
-        self.labels_classes = tf.reshape(labels[:, :, :, self.boundry_1+1:-1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_class])
-        self.labels_conf = tf.reshape(labels[:, :, :, -1], [self.Batch_Size, self.cell_size, self.cell_size, 1])
+        response = tf.reshape(labels[:, :, :, 0], [self.Batch_Size, self.cell_size, self.cell_size, 1])
+        labels_coord = tf.reshape(labels[:, :, :, 1:self.boundry_1+1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_coord])
+        labels_classes = tf.reshape(labels[:, :, :, self.boundry_1+1:-1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_class])
+        labels_conf = tf.reshape(labels[:, :, :, -1], [self.Batch_Size, self.cell_size, self.cell_size, 1])
 
-        self.off_set = tf.constant(self.off_set, dtype=tf.float32)
-        self.off_set = tf.reshape(self.off_set, [1, self.cell_size, self.cell_size, self.boxes_per_cell])
-        self.off_set = tf.tile(self.off_set, [self.Batch_Size, 1, 1, 1])   
-        ## off_set shape : [self.Batch_Size, self.cell_size, self.cell_size, self.boxes_per_cell]
+        off_set = tf.constant(self.off_set, dtype=tf.float32)
+        off_set = tf.reshape(off_set, [1, self.cell_size, self.cell_size, 18 * self.boxes_per_cell])
+        off_set = tf.tile(off_set, [self.Batch_Size, 1, 1, 1])   
+        ## off_set shape : [self.Batch_Size, self.cell_size, self.cell_size, 18 * self.boxes_per_cell]
 
-        predict_boxes_tran = tf.stack([(self.predict_coord)])
-        #self.dt_x = dist(self.predict_coord, self.labels_coord)
-        #self.predict_conf = confidence_func(self.dt_x)
+        off_set_centroids = off_set[:, :, :, :2*self.boxes_per_cell]
+        off_set_corners = off_set[:, :, :, 2*self.boxes_per_cell:]
 
+        predict_boxes_tran = tf.stack(tf.nn.sigmoid(tf.add(predict_coord[:, :, :, :2], off_set_centroids)),
+                                    tf.add(predict_coord[:, :, :, 2:], off_set_corners))  
+        ## predicts coordinates with respect to input images, [self.Batch_Size, self.cell_size, self.cell_size, 18]
+        ## see paper section3.2
+        
+        dt_x = dist(predict_boxes_tran, labels_coord)
+        predict_conf = confidence_func(dt_x)
+        
         ## coord loss
-
-
-        return loss

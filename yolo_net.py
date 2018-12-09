@@ -27,6 +27,7 @@ class YOLONet(object):
         self.batch_size = cfg.BATCH_SIZE
         self.alpha = cfg.ALPHA
 
+        ## shape of offset: 3-D [self.cell_size, self.cell_size, self.boxes_per_cell]
         self.offset = np.transpose(np.reshape(np.array(
             [np.arange(self.cell_size)] * self.cell_size * self.boxes_per_cell),
             (self.boxes_per_cell, self.cell_size, self.cell_size)), (1, 2, 0))
