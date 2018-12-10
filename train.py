@@ -96,6 +96,10 @@ if __name__ == "__main__":
     img_width = 640
     img_height = 480
 
+    # Specify the model and loss
+    Yolo = YOLO6D_net()
+    region_loss = Yolo.total_loss
+    
     ##Variables to save
     training_iters     = []
     training_losses    = []
@@ -112,7 +116,8 @@ if __name__ == "__main__":
     corners3D = get_3D_corners(vertices)
     internal_calibration = get_camera_intrinsic()
 
+    # Specify the number of workers
+    kwargs = {'num_workers': num_workers, 'pin_memory': True} if use_cuda else {}
 
-    Yolo = YOLO6D_net()
-    region_loss = Yolo.total_loss
+
     
