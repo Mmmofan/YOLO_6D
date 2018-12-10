@@ -20,7 +20,7 @@ class YOLO6D_net:
     EPSILON = cfg.EPSILON
     learning_rate = cfg.LEARNING_RATE
     optimizer = None
-    #loss = None
+    loss = None
     disp = cfg.DISP
     param_num = 0
     boxes_per_cell = cfg.BOXES_PER_CELL
@@ -33,7 +33,7 @@ class YOLO6D_net:
     num_coord = cfg.NUM_COORD  ## 9 points, 8 corners + 1 centroid
 
     obj_scale = cfg.CONF_OBJ_SCALE
-    noobje_scale = cfg.CONF_NOOBJ_SCALE
+    noobj_scale = cfg.CONF_NOOBJ_SCALE
     class_scale = cfg.CLASS_SCALE
     coord_scale = cfg.COORD_SCALE
 
@@ -55,7 +55,7 @@ class YOLO6D_net:
                                     [np.arange(self.cell_size)] * self.cell_size * 18 * self.boxes_per_cell),
                                     (1, self.cell_size, self.cell_size)),
                                     (1, 2, 0))
-        if self.is_training:
+        if is_training:
             """
             Input labels struct:
             [
@@ -68,7 +68,7 @@ class YOLO6D_net:
             self.labels = tf.placeholder(tf.float32, [None, self.cell_size, self.cell_size, 18 + 1 + self.num_class + 1], name='Labels')
             self.loss_layer(self.logit, self.labels)
             self.total_loss = tf.losses.get_total_loss()
-        
+            tf.summary.scalar('Total loss', self.total_loss)
 
     def _build_net(self, input_size):
         if self.disp:
@@ -198,7 +198,21 @@ class YOLO6D_net:
         ## predicts coordinates with respect to input images, [self.Batch_Size, self.cell_size, self.cell_size, 18]
         ## see paper section3.2
         
-        dt_x = dist(predict_boxes_tran, labels_coord)
-        predict_conf = confidence_func(dt_x)
+        object_coef = tf.constant(self.obj_scale, dtype=tf.float32)
+        noobject_coef = tf.constant(self.noobj_scale, dtype=tf.float32)
+        obj_mask = tf.ones_like(response) * noobject_coef + response * object_coef
+
+        #dt_x = dist(predict_boxes_tran, labels_coord)
+        #predict_conf = confidence_func(dt_x)
         
-        ## coord loss
+        ## coordinates loss
+        coord_loss = tf.losses.mean_squared_error(labels_coord, predict_coord, weights=self.coord_scale, scope='Coord Loss')
+        ## confidence loss
+        conf_loss = tf.losses.mean_squared_error(labels_conf, predict_conf, weights=obj_mask, scope='Conf Loss')
+        ## classification loss
+        class_loss = tf.losses.softmax_cross_entropy(labels_classes, predict_classes, weights=self.class_scale, scope='Class Loss')
+
+        tf.losses.add_loss(coord_loss)
+        tf.losses.add_loss(conf_loss)
+        tf.losses.add_loss(class_loss)
+

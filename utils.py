@@ -30,25 +30,62 @@ def dist(x1, x2, name='Distance'):
     ### dist: 4-D tensor [batch_size, cell_size, cell_size, 9]
     return dist
 
-def calcu_iou(boxes1, boxes2, scope='iou'):
-    """
-    calculate 2 boxes' iou, used in YOLO, but NOT USED IN YOLO-6D
-    Args: 
-        boxes1: 4-D tensor [batch_size, cell_size, cell_size, 18] ===> [x_center, y_center, x1, y1, ..., x8, y8]
-        boxes2: 4-D tensor [batch_size, cell_size, cell_size, 18] ===> [x_center, y_center, x1, y1, ..., x8, y8]
-    Return: 
-        iou: 4-D tensor [batch_size, cell_size, cell_size, 1]
-    """
-    with tf.variable_scope(scope):
-        boxes1 = tf.stack([boxes1[:, :, :, :, 0] - boxes1[:, :, :, :, 2] / 2.0,
-                            boxes1[:, :, :, :, 1] - boxes1[:, :, :, :, 3] / 2.0,
-                            boxes1[:, :, :, :, 0] + boxes1[:, :, :, :, 2] / 2.0,
-                            boxes1[:, :, :, :, 1] + boxes1[:, :, :, :, 3] / 2.0])
-        boxes1 = tf.transpose(boxes1, [1, 2, 3, 4, 0])
+def file_lines(thefilepath):
+    count = 0
+    thefile = open(thefilepath, 'rb')
+    while True:
+        buffer = thefile.read(8192*1024)
+        if not buffer:
+            break
+        count += buffer.count('\n')
+    thefile.close( )
+    return count
 
-        boxes2 = tf.stack([boxes2[:, :, :, :, 0] - boxes2[:, :, :, :, 2] / 2.0,
-                            boxes2[:, :, :, :, 1] - boxes2[:, :, :, :, 3] / 2.0,
-                            boxes2[:, :, :, :, 0] + boxes2[:, :, :, :, 2] / 2.0,
-                            boxes2[:, :, :, :, 1] + boxes2[:, :, :, :, 3] / 2.0])
-        boxes2 = tf.transpose(boxes2, [1, 2, 3, 4, 0])
-        
+def read_data_cfg(datacfg):
+    options = dict()
+    options['gpus'] = '0,1,2,3'
+    options['num_workers'] = '10'
+    with open(datacfg, 'r') as fp:
+        lines = fp.readlines()
+
+    for line in lines:
+        line = line.strip()
+        if line == '':
+            continue
+        key,value = line.split('=')
+        key = key.strip()
+        value = value.strip()
+        options[key] = value
+    return options
+
+def makedirs(path):
+    if not os.path.exists( path ):
+        os.makedirs( path )
+
+def get_3D_corners(vertices):
+    
+    min_x = np.min(vertices[0,:])
+    max_x = np.max(vertices[0,:])
+    min_y = np.min(vertices[1,:])
+    max_y = np.max(vertices[1,:])
+    min_z = np.min(vertices[2,:])
+    max_z = np.max(vertices[2,:])
+
+    corners = np.array([[min_x, min_y, min_z],
+                        [min_x, min_y, max_z],
+                        [min_x, max_y, min_z],
+                        [min_x, max_y, max_z],
+                        [max_x, min_y, min_z],
+                        [max_x, min_y, max_z],
+                        [max_x, max_y, min_z],
+                        [max_x, max_y, max_z]])
+
+    corners = np.concatenate((np.transpose(corners), np.ones((1,8)) ), axis=0)
+    return corners
+
+def get_camera_intrinsic():
+    K = np.zeros((3, 3), dtype='float64')
+    K[0, 0], K[0, 2] = 572.4114, 325.2611
+    K[1, 1], K[1, 2] = 573.5704, 242.0489
+    K[2, 2] = 1.
+    return K
