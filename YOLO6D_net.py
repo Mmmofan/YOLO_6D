@@ -69,6 +69,7 @@ class YOLO6D_net:
             self.loss_layer(self.logit, self.labels)
             self.total_loss = tf.losses.get_total_loss()
             tf.summary.scalar('Total loss', self.total_loss)
+            self.conf_in_test = self.confidence_in_testing(self.logit, self.labels)
 
     def _build_net(self, input):
         if self.disp:
@@ -217,15 +218,11 @@ class YOLO6D_net:
             tf.losses.add_loss(class_loss)
 
     def confidence_in_testing(self, predicts, labels, scope='confidence_in_test'):
+
         with tf.variable_scope(scope):
             predict_coord = tf.reshape(predicts[:, :, :, :self.boundry_1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_coord])
-            #predict_classes = tf.reshape(predicts[:, :, :, self.boundry_1:-1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_class])
-            #predict_conf = tf.reshape(predicts[:, :, :, -1], [self.Batch_Size, self.cell_size, self.cell_size, 1])
 
-            #response = tf.reshape(labels[:, :, :, 0], [self.Batch_Size, self.cell_size, self.cell_size, 1])
             labels_coord = tf.reshape(labels[:, :, :, 1:self.boundry_1+1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_coord])
-            #labels_classes = tf.reshape(labels[:, :, :, self.boundry_1+1:-1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_class])
-            #labels_conf = tf.reshape(labels[:, :, :, -1], [self.Batch_Size, self.cell_size, self.cell_size, 1])
 
             off_set = tf.constant(self.off_set, dtype=tf.float32)
             off_set = tf.reshape(off_set, [1, self.cell_size, self.cell_size, 18 * self.boxes_per_cell])
