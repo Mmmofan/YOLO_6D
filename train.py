@@ -1,5 +1,6 @@
 from __future__ import print_function
 import sys
+import argparse
 import YOLO6D_net
 import datetime
 import os
@@ -58,66 +59,39 @@ class Solver(object):
 
     #def train(self, epoch):
 
+def update_config_paths(data_dir, weights_file):
+    cfg.DATA_DIR = data_dir
+    cfg.DATASETS_DIR = os.path.join(data_dir, 'datasets')
+    cfg.CACHE_DIR = os.path.join(cfg.DATASETS_DIR, 'cache')
+    cfg.OUTPUT_DIR = os.path.join(cfg.DATASETS_DIR, 'output')
+    cfg.WEIGHTS_DIR = os.path.join(cfg.DATASETS_DIR, 'weights')
+    cfg.WEIGHTS_FILE = os.path.join(cfg.WEIGHTS_DIR, weights_file)
 
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--weights', default="YOLO_6D.ckpt", type=str)
+    parser.add_argument('--data_dir', default="data", type=str)
+    parser.add_argument('--threshold', default=0.2, type=float)
+    parser.add_argument('--iou_threshold', default=0.5, type=float)
+    parser.add_argument('--gpu', default='', type=str)
+    args = parser.parse_args()
+
+    if args.gpu is not None:
+        cfg.GPU = args.gpu
+    
+    if args.data_dir != cfg.DATA_DIR:
+        update_config_paths(args.data_dir, args.weights)
+        
+    os.environ['CUDA_VISABLE_DEVICES'] = cfg.GPU
+
+    yolo = YOLO6D_net()
+    #datasets = 
+
+    #solver = Solver(yolo, datasets)
+    print("------start training------")
+    #solver.train()
+    print("-------training end-------")
 
 if __name__ == "__main__":
     
-    #Training settings
-    datacfg = sys.argv[1]
-    weight_file = sys.argv[2]
-
-    ##Parse configuration files
-    data_options  = read_data_cfg(datacfg)
-    trainlist     = data_options['train']
-    testlist      = data_options['valid']
-    nsamples      = file_lines(trainlist)
-    gpus          = data_options['gpus']  # e.g. 0,1,2,3
-    gpus = '0'
-    meshname      = data_options['mesh']
-    num_workers   = int(data_options['num_workers'])
-    backupdir     = data_options['backup']
-    diam          = float(data_options['diam'])
-    vx_threshold  = diam * 0.1
-    if not os.path.exists(backupdir):
-        makedirs(backupdir)
-
-    ##Training Parameters
-    max_epoch = 700  ## max_batch * batch_size / nSamples + 1
-    use_cuda = True
-    eps = 1e-5
-    save_interval = 10 #epoches
-    dot_interval = 70 #batches
-    best_acc = -1
-
-    ##Testing Parameters
-    conf_thresh = 0.1
-    nms_thresh = 0.4
-    iou_thresh = 0.5
-    img_width = 640
-    img_height = 480
-
-    # Specify the model and loss
-    Yolo = YOLO6D_net()
-    region_loss = Yolo.total_loss
-    
-    ##Variables to save
-    training_iters     = []
-    training_losses    = []
-    testing_iters      = []
-    testing_losses     = []
-    testing_err_trans  = []
-    testing_err_pixel  = []
-    testing_err_angle  = []
-    testing_accuracies = []
-
-    ##Get the intrinsic camera matrix, mesh, vertices, and corners of the model
-    mesh = MeshPly(meshname)
-    vertices = np.c_[np.array(mesh.vertices), np.ones((len(mesh.vertices), 1))].T
-    corners3D = get_3D_corners(vertices)
-    internal_calibration = get_camera_intrinsic()
-
-    # Specify the number of workers
-    kwargs = {'num_workers': num_workers, 'pin_memory': True} if use_cuda else {}
-
-
-    
+    main()
