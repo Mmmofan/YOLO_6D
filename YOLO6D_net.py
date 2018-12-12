@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-from utils import *
+from utils import utils
 import sys
 import config as cfg
 
@@ -102,7 +102,7 @@ class YOLO6D_net:
         self.x = self.conv(self.x, 3, 1, 1024, num=22)
         self.x = self.merge_layer(self.x, self.x_ps, name='Merge')
         self.x = self.conv(self.x, 3, 1, 1024, num=23)
-        self.x = self.conv(self.x, 1, 1, 18 + 1 + self.num_class, num=24)
+        self.x = self.conv(self.x, 1, 1, 18 + 1 + self.num_class, num=24) ## 9 points 1 confidence C classes
         return self.x
 
     def conv(self, x, kernel_size, strides, filters, num, pad='SAME', scope='Conv_layer'):
@@ -206,7 +206,7 @@ class YOLO6D_net:
             obj_mask = tf.ones_like(response) * noobject_coef + response * object_coef
 
             ## coordinates loss
-            coord_loss = tf.losses.mean_squared_error(predict_boxes_tran, predict_coord, weights=self.coord_scale, scope='Coord Loss')
+            coord_loss = tf.losses.mean_squared_error(labels_coord, predict_boxes_tran, weights=self.coord_scale, scope='Coord Loss')
             ## confidence loss
             conf_loss = tf.losses.mean_squared_error(labels_conf, predict_conf, weights=obj_mask, scope='Conf Loss')
             ## classification loss
@@ -241,6 +241,6 @@ class YOLO6D_net:
             ## output is offset with respect to centroid, so has to add the centroid coord(top-left corners of every cell)
             ## see paper section3.2
 
-            dt_x = dist(predict_boxes_tran, labels_coord)
-            confidence = confidence_func(dt_x)
+            dt_x = utils.dist(predict_boxes_tran, labels_coord)
+            confidence = utils.confidence_func(dt_x)
         return confidence
