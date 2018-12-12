@@ -218,7 +218,6 @@ class YOLO6D_net:
 
     def confidence_in_testing(self, predicts, labels, scope='confidence_in_test'):
         with tf.variable_scope(scope):
-            
             predict_coord = tf.reshape(predicts[:, :, :, :self.boundry_1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_coord])
             #predict_classes = tf.reshape(predicts[:, :, :, self.boundry_1:-1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_class])
             #predict_conf = tf.reshape(predicts[:, :, :, -1], [self.Batch_Size, self.cell_size, self.cell_size, 1])
