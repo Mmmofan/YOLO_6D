@@ -7,9 +7,11 @@ import os
 from utils import *
 from MeshPly import MeshPly
 import config as cfg
-from YOLO6D_net import YOLO6D_net
-import tensorflow as tf
 import numpy as np
+import tensorflow as tf
+from YOLO6D_net import YOLO6D_net
+from Data import Data
+
 
 
 class Solver(object):
@@ -28,6 +30,7 @@ class Solver(object):
         self.output_dir = os.path.join(cfg.OUTPUT_DIR, datetime.datetime.now().strftime('%Y_%m_%d_%H_%M'))
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
+        self.save_config()
 
         self.variable_to_restore = tf.global_variables()
         self.restorer = tf.train.Saver(self.variable_to_restore, max_to_keep=None)
@@ -57,7 +60,54 @@ class Solver(object):
 
         self.writer.add_graph(self.sess.graph)
 
-    #def train(self, epoch):
+    def train(self):
+        for step in range(1, self.max_iter + 1):
+            images, labels = self.data.get()
+            feed_dict = {self.net.images: images, self.net.labels: labels}
+
+            if step % self.summary_iter == 0:
+                if step % (self.summary_iter * 10) == 0:
+                    summary_str, loss, _ = self.sess.run(
+                        [self.summary_op, self.net.total_loss, self.train_op],
+                        feed_dict=feed_dict
+                    )
+                    log_str = ('Epoch: {}, Step: {}, Learning rate: {},'
+                        ' Loss: {:5.3f}').format(
+                        self.data.epoch,
+                        int(step),
+                        round(self.learning_rate.eval(session=self.sess), 6),
+                        loss)
+                    print(log_str)
+                    #self.test()
+                else:
+                    summary_str, _ = self.sess.run(
+                        [self.summary_op, self.train_op],
+                        feed_dict=feed_dict
+                    )
+
+                self.writer.add_summary(summary_str, step)
+
+            else:
+                self.sess.run(self.train_op, feed_dict=feed_dict)
+
+            if step % self.save_iter == 0:
+                print('Save checkpoint file to: {}'.format(
+                    self.output_dir
+                ))
+                self.saver.save(self.sess, self.ckpt_file, 
+                                global_step=self.global_step)
+
+    #def test(self):
+
+
+    def save_config(self):
+        with open(os.path.join(self.output_dir, 'config.txt'), 'rw') as f:
+            cfg_dict = cfg.__dict__
+            for key in sorted(cfg_dict.keys()):
+                if key[0].isupper():
+                    cfg_str = '{}: {}\n'.format(key, cfg_dict[key])
+                    f.write(cfg_str)
+
 
 def update_config_paths(data_dir, weights_file):
     cfg.DATA_DIR = data_dir
@@ -85,11 +135,13 @@ def main():
     os.environ['CUDA_VISABLE_DEVICES'] = cfg.GPU
 
     yolo = YOLO6D_net()
-    #datasets = 
+    datasets = Data()
+
+    #epochs = datasets.epoch
 
     #solver = Solver(yolo, datasets)
     print("------start training------")
-    #solver.train()
+    solver.train()
     print("-------training end-------")
 
 if __name__ == "__main__":
