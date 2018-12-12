@@ -51,9 +51,9 @@ class YOLO6D_net:
         """
         off_set:  [self.cell_size, self.cell_size, 18]
         """
-        self.off_set = tf.transpose(np.reshape(np.array(
+        self.off_set = np.transpose(np.reshape(np.array(
                                     [np.arange(self.cell_size)] * self.cell_size * 18 * self.boxes_per_cell),
-                                    (1, self.cell_size, self.cell_size)),
+                                    (18, self.cell_size, self.cell_size)),
                                     (1, 2, 0))
         if is_training:
             """
@@ -74,56 +74,61 @@ class YOLO6D_net:
     def _build_net(self, input):
         if self.disp:
             print("-----building network-----")
-        self.x = self.conv(input, 3, 1, 32, num=1)
-        self.x = self.max_pool_layer(self.x, name='MaxPool1')
-        self.x = self.conv(self.x, 3, 1, 64, num=2)
-        self.x = self.max_pool_layer(self.x, name='MaxPool2')
-        self.x = self.conv(self.x, 3, 1, 128, num=3)
-        self.x = self.conv(self.x, 1, 1, 64, num=4)
-        self.x = self.conv(self.x, 3, 1, 128, num=5)
-        self.x = self.max_pool_layer(self.x, name='MaxPool3')
-        self.x = self.conv(self.x, 3, 1, 256, num=6)
-        self.x = self.conv(self.x, 1, 1, 128, num=7)
-        self.x = self.conv(self.x, 3, 1, 256, num=8)
-        self.x = self.max_pool_layer(self.x, name='MaxPool4')
-        self.x = self.conv(self.x, 3, 1, 512, num=9)
-        self.x = self.conv(self.x, 1, 1, 256, num=10)
-        self.x = self.conv(self.x, 3, 1, 512, num=11)
-        self.x = self.conv(self.x, 1, 1, 256, num=12)
-        self.x = self.conv(self.x, 3, 1, 512, num=13)
-        self.x_ps = self.conv(self.x, 1, 1, 64, num=14)    #add a pass through layer
-        self.x_ps = self.conv(self.x_ps, 3, 2, 256, num=15)   
-        self.x = self.max_pool_layer(self.x, name='MaxPool5')    #continue straight layer
-        self.x = self.conv(self.x, 3, 1, 1024, num=16)
-        self.x = self.conv(self.x, 1, 1, 512, num=17)
-        self.x = self.conv(self.x, 3, 1, 1024, num=18)
-        self.x = self.conv(self.x, 1, 1, 512, num=19)
-        self.x = self.conv(self.x, 3, 1, 1024, num=20)
-        self.x = self.conv(self.x, 3, 1, 1024, num=21)
-        self.x = self.conv(self.x, 3, 1, 1024, num=22)
-        self.x = self.merge_layer(self.x, self.x_ps, name='Merge')
-        self.x = self.conv(self.x, 3, 1, 1024, num=23)
-        self.x = self.conv(self.x, 1, 1, 18 + 1 + self.num_class, num=24) ## 9 points 1 confidence C classes
-        return self.x
+        x = self.conv(input, 3, 1, 32, num=1)
+        x = self.max_pool_layer(x, name='MaxPool1')
+        x = self.conv(x, 3, 1, 64, num=2)
+        x = self.max_pool_layer(x, name='MaxPool2')
+        x = self.conv(x, 3, 1, 128, num=3)
+        x = self.conv(x, 1, 1, 64, num=4)
+        x = self.conv(x, 3, 1, 128, num=5)
+        x = self.max_pool_layer(x, name='MaxPool3')
+        x = self.conv(x, 3, 1, 256, num=6)
+        x = self.conv(x, 1, 1, 128, num=7)
+        x = self.conv(x, 3, 1, 256, num=8)
+        x = self.max_pool_layer(x, name='MaxPool4')
+        x = self.conv(x, 3, 1, 512, num=9)
+        x = self.conv(x, 1, 1, 256, num=10)
+        x = self.conv(x, 3, 1, 512, num=11)
+        x = self.conv(x, 1, 1, 256, num=12)
+        x = self.conv(x, 3, 1, 512, num=13)
+        x_ps = self.conv(x, 1, 1, 64, num=14)    #add a pass through layer
+        x_ps = self.conv(x_ps, 3, 2, 256, num=15)   
+        x = self.max_pool_layer(x, name='MaxPool5')    #continue straight layer
+        x = self.conv(x, 3, 1, 1024, num=16)
+        x = self.conv(x, 1, 1, 512, num=17)
+        x = self.conv(x, 3, 1, 1024, num=18)
+        x = self.conv(x, 1, 1, 512, num=19)
+        x = self.conv(x, 3, 1, 1024, num=20)
+        x = self.conv(x, 3, 1, 1024, num=21)
+        x = self.conv(x, 3, 1, 1024, num=22)
+        x = self.merge_layer(x, x_ps, name='Merge')
+        x = self.conv(x, 3, 1, 1024, num=23)
+        x = self.conv(x, 1, 1, 18 + 1 + self.num_class, num=24) ## 9 points 1 confidence C classes
 
-    def conv(self, x, kernel_size, strides, filters, num, pad='SAME', scope='Conv_layer'):
+        if self.disp:
+            print("----building network complete----")
+        return x
+
+    def conv(self, x, kernel_size, strides, filters, num, pad='SAME'):
         """
         Conv ==> ReLU ==> Batch_Norm
         """
-        with tf.variable_scope(scope):
-            x = self.conv_layer(x, kernel_size, strides, filters, pad='SAME', name='Conv:{0}'.format(num))
+        with tf.variable_scope('Conv_%d' %(num)):
+            name = 'Conv{}'.format(num)
+            x = self.conv_layer(x, kernel_size, strides, filters, pad='SAME', name=name)
             x = self.activation(x)
             if self.Batch_Norm:
                 x = self.bn(x)
         return x
 
-    def conv_layer(self, x, kernel_size, strides, filters, name, pad='SAME'):
+    def conv_layer(self, x, kernel_size, stride, filters, name, pad='SAME'):
         x_shape = x.get_shape()
         x_channels = x_shape[3].value
         weight_shape = [kernel_size, kernel_size, x_channels, filters]
         bias_shape = [filters]
-        weight = self._get_variable(name, weight_shape, initializer=tf.truncated_normal_initializer)
-        bias = self._get_variable(name, bias_shape, initializer=tf.constant(0.0))
+        strides = [stride, stride, stride, stride]
+        weight = self._get_variable("weight", weight_shape, initializer=tf.truncated_normal_initializer(stddev=0.1))
+        bias = self._get_variable("bias", bias_shape, initializer=tf.constant_initializer(0.0))
         y = tf.nn.conv2d(x, weight, strides=strides, padding=pad, name=name)
         y = tf.add(y, bias, name=name)
         return y
@@ -133,7 +138,8 @@ class YOLO6D_net:
         input are 2 tensors from different conv_layer
         """
         x_list = [x1, x2]
-        y = tf.concat(3, x_list, name=name)
+        dims = tf.constant(3, dtype=tf.int32)
+        y = tf.concat(x_list, 3, name=name)
         return y
 
     def max_pool_layer(self, x, name):
@@ -164,7 +170,7 @@ class YOLO6D_net:
         else:
             regularizer = None
         
-        return tf.get_variable(name, shape = shape, regularizer=regularizer, initializer=initializer)
+        return tf.get_variable(name, shape=shape, regularizer=regularizer, initializer=initializer)
 
     def get_optimizer(self):
         ##choose an optimizer to train the network
@@ -196,8 +202,8 @@ class YOLO6D_net:
             off_set_centroids = off_set[:, :, :, :2*self.boxes_per_cell]
             off_set_corners = off_set[:, :, :, 2*self.boxes_per_cell:]
 
-            predict_boxes_tran = tf.stack(tf.add(tf.nn.sigmoid(predict_coord[:, :, :, :2]), off_set_centroids),
-                                        tf.add(predict_coord[:, :, :, 2:], off_set_corners)) 
+            predict_boxes_tran = tf.concat([tf.add(tf.nn.sigmoid(predict_coord[:, :, :, :2]), off_set_centroids),
+                                        tf.add(predict_coord[:, :, :, 2:], off_set_corners)], 3) 
             ## predicts coordinates with respect to input images, [Batch_Size, cell_size, cell_size, 18]
             ## output is offset with respect to centroid, so has to add the centroid coord(top-left corners of every cell)
             ## see paper section3.2
@@ -207,11 +213,11 @@ class YOLO6D_net:
             obj_mask = tf.ones_like(response) * noobject_coef + response * object_coef
 
             ## coordinates loss
-            coord_loss = tf.losses.mean_squared_error(labels_coord, predict_boxes_tran, weights=self.coord_scale, scope='Coord Loss')
+            coord_loss = tf.losses.mean_squared_error(labels_coord, predict_boxes_tran, weights=self.coord_scale, scope='Coord_Loss')
             ## confidence loss
-            conf_loss = tf.losses.mean_squared_error(labels_conf, predict_conf, weights=obj_mask, scope='Conf Loss')
+            conf_loss = tf.losses.mean_squared_error(labels_conf, predict_conf, weights=obj_mask, scope='Conf_Loss')
             ## classification loss
-            class_loss = tf.losses.softmax_cross_entropy(labels_classes, predict_classes, weights=self.class_scale, scope='Class Loss')
+            class_loss = tf.losses.softmax_cross_entropy(labels_classes, predict_classes, weights=self.class_scale, scope='Class_Loss')
 
             tf.losses.add_loss(coord_loss)
             tf.losses.add_loss(conf_loss)
@@ -232,8 +238,8 @@ class YOLO6D_net:
             off_set_centroids = off_set[:, :, :, :2*self.boxes_per_cell]
             off_set_corners = off_set[:, :, :, 2*self.boxes_per_cell:]
 
-            predict_boxes_tran = tf.stack(tf.add(tf.nn.sigmoid(predict_coord[:, :, :, :2]), off_set_centroids),
-                                        tf.add(predict_coord[:, :, :, 2:], off_set_corners)) 
+            predict_boxes_tran = tf.concat([tf.add(tf.nn.sigmoid(predict_coord[:, :, :, :2]), off_set_centroids),
+                                        tf.add(predict_coord[:, :, :, 2:], off_set_corners)], 3) 
             ## predicts coordinates with respect to input images, [Batch_Size, cell_size, cell_size, 18]
             ## output is offset with respect to centroid, so has to add the centroid coord(top-left corners of every cell)
             ## see paper section3.2
