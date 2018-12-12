@@ -5,12 +5,12 @@ import YOLO6D_net
 import datetime
 import os
 from utils import *
-from MeshPly import MeshPly
+from utils.MeshPly import MeshPly
 import config as cfg
 import numpy as np
 import tensorflow as tf
 from YOLO6D_net import YOLO6D_net
-from Data import Data
+#from Data import Data
 
 
 
@@ -135,13 +135,13 @@ def main():
     os.environ['CUDA_VISABLE_DEVICES'] = cfg.GPU
 
     yolo = YOLO6D_net()
-    datasets = Data()
+    #datasets = Data()
 
     #epochs = datasets.epoch
 
     #solver = Solver(yolo, datasets)
     print("------start training------")
-    solver.train()
+    #solver.train()
     print("-------training end-------")
 
 if __name__ == "__main__":
