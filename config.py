@@ -16,6 +16,7 @@ WEIGHTS_FILE = os.path.join(DATA_DIR, 'weights', 'yolo_6d.ckpt')
 
 ##Network parameters
 BATCH_SIZE = 32
+TEST_BATCH_SIZE =64
 WEIGHT_DECAY = 0.0005
 MAX_PAD = 'SAME'
 EPSILON = 1e-5
