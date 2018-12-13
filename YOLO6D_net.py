@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+# ---------------------
+# Yolo6d network, include losses
+# @Author: Fan, Mo
+# @Email: fmo@nullmax.ai
+# ---------------------
+
 import tensorflow as tf
 import numpy as np
 from utils import utils
