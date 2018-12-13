@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+# ---------------------
+# solver file for yolo-6d
+# @Author: Fan, Mo
+# @Email: fmo@nullmax.ai
+# ---------------------
+
 from __future__ import print_function
 import sys
 import argparse

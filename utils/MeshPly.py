@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Class to read 
 
 class MeshPly:
