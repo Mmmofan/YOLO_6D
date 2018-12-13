@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+# ---------------------
+# configuration for yolo-6d
+# @Author: Fan, Mo
+# Email: fmo@nullmax.ai
+# ---------------------
+
 import os
 
 """
