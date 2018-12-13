@@ -12,6 +12,7 @@ import YOLO6D_net
 import datetime
 import os
 from utils import *
+from utils.timer import Timer
 from utils.MeshPly import MeshPly
 import config as cfg
 import numpy as np
@@ -68,39 +69,57 @@ class Solver(object):
         self.writer.add_graph(self.sess.graph)
 
     def train(self):
+
+        train_timer = Timer()
+        load_timer = Timer()
+
         for step in range(1, self.max_iter + 1):
+            load_timer.tic()
             images, labels = self.data.get()
+            load_timer.toc()
+
             feed_dict = {self.net.images: images, self.net.labels: labels}
 
             if step % self.summary_iter == 0:
                 if step % (self.summary_iter * 10) == 0:
+                    train_timer.tic()
                     summary_str, loss, _ = self.sess.run(
                         [self.summary_op, self.net.total_loss, self.train_op],
                         feed_dict=feed_dict
                     )
-                    log_str = ('Epoch: {}, Step: {}, Learning rate: {},'
-                        ' Loss: {:5.3f}').format(
+                    train_timer.toc()
+
+                    log_str = ('{}Epoch: {}, Step: {}, Learning rate: {},'
+                        ' Loss: {:5.3f}\nSpeed: {:.3f}s/iter,'
+                        ' Load: {:.3f}s/iter, Remain: {}').format(
+                        datetime.datetime.now().strftime('%m/%d %H:%M:%S')
                         self.data.epoch,
                         int(step),
                         round(self.learning_rate.eval(session=self.sess), 6),
-                        loss)
+                        loss,
+                        train_timer.average_time,
+                        load_timer.average_time,
+                        train_timer.remain(step, self.max_iter))
                     print(log_str)
                     #self.test()
                 else:
+                    train_timer.tic()
                     summary_str, _ = self.sess.run(
                         [self.summary_op, self.train_op],
-                        feed_dict=feed_dict
-                    )
+                        feed_dict=feed_dict)
+                    train_timer.toc()
 
                 self.writer.add_summary(summary_str, step)
 
             else:
+                train_timer.tic()
                 self.sess.run(self.train_op, feed_dict=feed_dict)
+                train_timer.toc()
 
             if step % self.save_iter == 0:
+                datetime.datetime.now().strftime('%m/%d %H:%M:%S')
                 print('Save checkpoint file to: {}'.format(
-                    self.output_dir
-                ))
+                    self.output_dir))
                 self.saver.save(self.sess, self.ckpt_file, 
                                 global_step=self.global_step)
 
