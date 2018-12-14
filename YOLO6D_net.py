@@ -33,7 +33,7 @@ class YOLO6D_net:
     boxes_per_cell = cfg.BOXES_PER_CELL
     image_size = cfg.IMAGE_SIZE
 
-    num_class = 0
+    num_class = cfg.NUM_CLASSES
     Batch_Norm = cfg.BATCH_NORM
     ALPHA = cfg.ALPHA
     cell_size = cfg.CELL_SIZE
@@ -65,18 +65,14 @@ class YOLO6D_net:
         if is_training:
             """
             Input labels struct:
-            [
-                responsible: 1
-                9 points coord: 18
-                confidence: 1
-                class number: num_class
-            ]
+                [ responsible: 1, 9 points coord: 18, confidence: 1, class number: num_class ]
             """
             self.labels = tf.placeholder(tf.float32, [None, self.cell_size, self.cell_size, 18 + 1 + self.num_class + 1], name='Labels')
             self.loss_layer(self.logit, self.labels)
             self.total_loss = tf.losses.get_total_loss()
             tf.summary.scalar('Total loss', self.total_loss)
-            self.conf_in_test = self.confidence_in_testing(self.logit, self.labels)
+            self.conf_value = self.confidence_value(self.logit, self.labels)
+            self.conf_score = self.confidence_score(self.logit)
 
     def _build_net(self, input):
         if self.disp:
@@ -114,6 +110,7 @@ class YOLO6D_net:
 
         if self.disp:
             print("----building network complete----")
+
         return x
 
     def conv(self, x, kernel_size, strides, filters, num, pad='SAME'):
@@ -179,10 +176,6 @@ class YOLO6D_net:
         
         return tf.get_variable(name, shape=shape, regularizer=regularizer, initializer=initializer)
 
-    def get_optimizer(self):
-        ##choose an optimizer to train the network
-        self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(self.loss)
-
     def loss_layer(self, predicts, labels, scope='Loss_layer'):
         """
         Args:
@@ -230,7 +223,7 @@ class YOLO6D_net:
             tf.losses.add_loss(conf_loss)
             tf.losses.add_loss(class_loss)
 
-    def confidence_in_testing(self, predicts, labels, scope='confidence_in_test'):
+    def confidence_value(self, predicts, labels, scope='confidence_value'):
 
         with tf.variable_scope(scope):
             predict_coord = tf.reshape(predicts[:, :, :, :self.boundry_1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_coord])
@@ -254,3 +247,17 @@ class YOLO6D_net:
             dt_x = utils.dist(predict_boxes_tran, labels_coord)
             confidence = utils.confidence_func(dt_x)
         return confidence
+
+    def confidence_score(self, predicts, scope='confidence_score'):
+        """
+        compute the class-specific confidence scores
+        see paper section 3.3
+        Args:
+            output tensor by net: [batch, cell_size, cell_size, 19+num_class]
+        """
+        predict_classes = tf.reshape(predicts[:, :, :, 18:-1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_class])
+        predict_conf = tf.reshape(predicts[:, :, :, -1], [self.Batch_Size, self.cell_size, self.cell_size, 1])
+        predict_conf = tf.tile(predict_conf, [1, 1, 1, self.num_class])
+        class_speci_conf_score = tf.multiply(predict_classes, predict_conf)
+        class_speci_conf_score = tf.reduce_mean(class_speci_conf_score, axis=3, keepdims=True)
+        return class_speci_conf_score
