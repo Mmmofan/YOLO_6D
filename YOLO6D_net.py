@@ -50,9 +50,6 @@ class YOLO6D_net:
         output tensor: [13 * 13 * (18 + 1 + num_classes)]
             self.input_images ==> self.logit
         """
-        self.input_images = tf.placeholder(tf.float32, [None, self.image_size, self.image_size, 3], name='Input')
-        self.logit = self._build_net(self.input_images)
-
         self.boundry_1 = 9 * 2 * self.boxes_per_cell   ## Seperate coordinates
         self.boundry_2 = self.num_class
         """
@@ -62,12 +59,16 @@ class YOLO6D_net:
                                     [np.arange(self.cell_size)] * self.cell_size * 18 * self.boxes_per_cell),
                                     (18, self.cell_size, self.cell_size)),
                                     (1, 2, 0))
+
+        self.input_images = tf.placeholder(tf.float32, [None, self.image_size, self.image_size, 3], name='Input')
+        self.logit = self._build_net(self.input_images)
+        self.labels = tf.placeholder(tf.float32, [None, self.cell_size, self.cell_size, 18 + 1 + self.num_class + 1], name='Labels')
+ 
         if is_training:
             """
             Input labels struct:
                 [ responsible: 1, 9 points coord: 18, confidence: 1, class number: num_class ]
             """
-            self.labels = tf.placeholder(tf.float32, [None, self.cell_size, self.cell_size, 18 + 1 + self.num_class + 1], name='Labels')
             self.loss_layer(self.logit, self.labels)
             self.total_loss = tf.losses.get_total_loss()
             tf.summary.scalar('Total loss', self.total_loss)
