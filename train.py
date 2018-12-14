@@ -24,6 +24,8 @@ from YOLO6D_net import YOLO6D_net
 
 class Solver(object):
     def __init__(self, net, data):
+        #Set parameters for training and testing
+
         self.net = net
         self.data = data
         self.batch_size = cfg.BATCH_SIZE
@@ -78,7 +80,7 @@ class Solver(object):
             images, labels = self.data.get()
             load_timer.toc()
 
-            feed_dict = {self.net.images: images, self.net.labels: labels}
+            feed_dict = {self.net.input_images: images, self.net.labels: labels}
 
             if step % self.summary_iter == 0:
                 if step % (self.summary_iter * 10) == 0:
@@ -92,7 +94,7 @@ class Solver(object):
                     log_str = ('{}Epoch: {}, Step: {}, Learning rate: {},'
                         ' Loss: {:5.3f}\nSpeed: {:.3f}s/iter,'
                         ' Load: {:.3f}s/iter, Remain: {}').format(
-                        datetime.datetime.now().strftime('%m/%d %H:%M:%S')
+                        datetime.datetime.now().strftime('%m/%d %H:%M:%S'),
                         self.data.epoch,
                         int(step),
                         round(self.learning_rate.eval(session=self.sess), 6),
