@@ -60,10 +60,10 @@ class Solver(object):
         with tf.control_dependencies([self.optimizer]):
             self.train_op = tf.group(self.averages_op)
 
-        gpu_option = tf.GPUOptions()
-        config = tf.ConfigProto(gpu_option=gpu_option)
+        gpu_options = tf.GPUOptions()
+        config = tf.ConfigProto(gpu_options=gpu_options)
         self.sess = tf.Session(config=config)
-        self.sess.run(tf.global_variables_initializer)
+        self.sess.run(tf.global_variables_initializer())
         if self.weight_file is not None:
             print('Restoring weights from: ' + self.weight_file)
             self.restorer.restore(self.sess, self.weight_file)
@@ -103,7 +103,7 @@ class Solver(object):
                         load_timer.average_time,
                         train_timer.remain(step, self.max_iter))
                     print(log_str)
-                    #self.test()
+                    self.test()
                 else:
                     train_timer.tic()
                     summary_str, _ = self.sess.run(
@@ -125,11 +125,21 @@ class Solver(object):
                 self.saver.save(self.sess, self.ckpt_file, 
                                 global_step=self.global_step)
 
-    #def test(self):
+    def test(self):
+        load_timer = Timer()
+
+        load_timer.tic()
+        images, labels = self.data.get()
+        load_timer.toc()
+
+        feed_dict = {self.net.input_images: images, self.net.labels: labels}
+        summary_str, _ = self.sess.run([self.summary_op, self.train_op], feed_dict=feed_dict)
+        
+        
 
 
     def save_config(self):
-        with open(os.path.join(self.output_dir, 'config.txt'), 'rw') as f:
+        with open(os.path.join(self.output_dir, 'config.txt'), 'w') as f:
             cfg_dict = cfg.__dict__
             for key in sorted(cfg_dict.keys()):
                 if key[0].isupper():
@@ -164,10 +174,10 @@ def main():
 
     yolo = YOLO6D_net()
     #datasets = Data()
-
+    datasets = None
     #epochs = datasets.epoch
 
-    #solver = Solver(yolo, datasets)
+    solver = Solver(yolo, datasets)
     print("------start training------")
     #solver.train()
     print("-------training end-------")
