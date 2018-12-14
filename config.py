@@ -22,6 +22,7 @@ WEIGHTS_DIR = os.path.join(DATASETS_DIR, 'weights')
 WEIGHTS_FILE = os.path.join(DATA_DIR, 'weights', 'yolo_6d.ckpt')
 
 ##Network parameters
+NUM_CLASSES = 20
 BATCH_SIZE = 32
 TEST_BATCH_SIZE =64
 WEIGHT_DECAY = 0.0005
@@ -55,5 +56,6 @@ SUMMARY_ITER = 10
 SAVE_ITER = 1000
 
 #Test parameters
-THRESHOLD = 0.3
+CONF_THRESHOLD = 0.1
+NMS_THRESHOLD = 0.4
 IOU_THRESHOLD = 0.5
