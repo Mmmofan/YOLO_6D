@@ -14,7 +14,8 @@ Path and Dataset parameters
 DISP = True
 
 ##Files parameters
-DATA_DIR = 'data'
+DATA_DIR = './data'  ##for windows
+#DATA_DIR = ''  ## for ubuntu
 DATASETS_DIR = os.path.join(DATA_DIR, 'datasets')
 CACHE_DIR = os.path.join(DATASETS_DIR, 'cache')
 OUTPUT_DIR = os.path.join(DATASETS_DIR, 'output')

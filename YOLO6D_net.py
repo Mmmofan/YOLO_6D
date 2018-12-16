@@ -27,7 +27,7 @@ class YOLO6D_net:
     EPSILON = cfg.EPSILON
     learning_rate = cfg.LEARNING_RATE
     optimizer = None
-    loss = None
+    total_loss = None
     disp = cfg.DISP
     param_num = 0
     boxes_per_cell = cfg.BOXES_PER_CELL
@@ -60,10 +60,11 @@ class YOLO6D_net:
                                     (18, self.cell_size, self.cell_size)),
                                     (1, 2, 0))
 
+        self.confidence = None
         self.input_images = tf.placeholder(tf.float32, [None, self.image_size, self.image_size, 3], name='Input')
         self.logit = self._build_net(self.input_images)
         self.labels = tf.placeholder(tf.float32, [None, self.cell_size, self.cell_size, 18 + 1 + self.num_class + 1], name='Labels')
- 
+
         if is_training:
             """
             Input labels struct:
@@ -72,12 +73,12 @@ class YOLO6D_net:
             self.loss_layer(self.logit, self.labels)
             self.total_loss = tf.losses.get_total_loss()
             tf.summary.scalar('Total loss', self.total_loss)
-            self.conf_value = self.confidence_value(self.logit, self.labels)
-            self.conf_score = self.confidence_score(self.logit)
+            self.conf_value = self.confidence
+            self.conf_score = self.confidence_score(self.logit, self.conf_value)
 
     def _build_net(self, input):
         if self.disp:
-            print("-----building network-----")
+            print("--------building network--------")
         x = self.conv(input, 3, 1, 32, num=1)
         x = self.max_pool_layer(x, name='MaxPool1')
         x = self.conv(x, 3, 1, 64, num=2)
@@ -181,9 +182,9 @@ class YOLO6D_net:
         """
         Args:
             predict tensor: [batch_size, cell_size, cell_size, 19 + num_class] 19 is 9-points'-coord(18) + 1-confidence
-                             last dimension: coord(18) ==> classes(num_class) ==> confidence(1)
+                            last dimension: coord(18) ==> classes(num_class) ==> confidence(1)
             labels tensor:  [batch_size, cell_size, cell_size, 20 + num_class] 20 is 9-points'-coord + 1-response + 1-confidence
-                             last dimension: response(1) ==> coord(18) ==> classes(num_class) ==> confidence(1)
+                            last dimension: response(1) ==> coord(18) ==> classes(num_class) ==> confidence(1)
         """
         with tf.variable_scope(scope):
             predict_coord = tf.reshape(predicts[:, :, :, :self.boundry_1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_coord])
@@ -199,7 +200,6 @@ class YOLO6D_net:
             off_set = tf.reshape(off_set, [1, self.cell_size, self.cell_size, 18 * self.boxes_per_cell])
             off_set = tf.tile(off_set, [self.Batch_Size, 1, 1, 1])   
             ## off_set shape : [self.Batch_Size, self.cell_size, self.cell_size, 18 * self.boxes_per_cell]
-            
             off_set_centroids = off_set[:, :, :, :2*self.boxes_per_cell]
             off_set_corners = off_set[:, :, :, 2*self.boxes_per_cell:]
 
@@ -209,14 +209,18 @@ class YOLO6D_net:
             ## output is offset with respect to centroid, so has to add the centroid coord(top-left corners of every cell)
             ## see paper section3.2
 
+            ## Calculate confidence (instead of IoU like in YOLOv2)
+            dt_x = utils.dist(predict_boxes_tran, labels_coord)
+            self.confidence = utils.confidence_func(dt_x)
+
             object_coef = tf.constant(self.obj_scale, dtype=tf.float32)
             noobject_coef = tf.constant(self.noobj_scale, dtype=tf.float32)
-            obj_mask = tf.ones_like(response) * noobject_coef + response * object_coef
+            conf_mask = tf.ones_like(response) * noobject_coef + response * object_coef # [batch. cell, cell, 1] with object:5.0, no object:0.1
 
             ## coordinates loss
-            coord_loss = tf.losses.mean_squared_error(labels_coord, predict_boxes_tran, weights=self.coord_scale, scope='Coord_Loss')
-            ## confidence loss
-            conf_loss = tf.losses.mean_squared_error(labels_conf, predict_conf, weights=obj_mask, scope='Conf_Loss')
+            coord_loss = tf.losses.mean_squared_error(labels_coord, predict_boxes_tran, weights=response, scope='Coord_Loss')
+            ## confidence loss, the loss between output confidence value and real confidence
+            conf_loss = tf.losses.mean_squared_error(labels_conf, self.confidence, weights=conf_mask, scope='Conf_Loss')
             ## classification loss
             class_loss = tf.losses.softmax_cross_entropy(labels_classes, predict_classes, weights=self.class_scale, scope='Class_Loss')
 
@@ -224,32 +228,7 @@ class YOLO6D_net:
             tf.losses.add_loss(conf_loss)
             tf.losses.add_loss(class_loss)
 
-    def confidence_value(self, predicts, labels, scope='confidence_value'):
-
-        with tf.variable_scope(scope):
-            predict_coord = tf.reshape(predicts[:, :, :, :self.boundry_1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_coord])
-
-            labels_coord = tf.reshape(labels[:, :, :, 1:self.boundry_1+1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_coord])
-
-            off_set = tf.constant(self.off_set, dtype=tf.float32)
-            off_set = tf.reshape(off_set, [1, self.cell_size, self.cell_size, 18 * self.boxes_per_cell])
-            off_set = tf.tile(off_set, [self.Batch_Size, 1, 1, 1])   
-            ## off_set shape : [Batch_Size, cell_size, cell_size, 18 * boxes_per_cell]
-
-            off_set_centroids = off_set[:, :, :, :2*self.boxes_per_cell]
-            off_set_corners = off_set[:, :, :, 2*self.boxes_per_cell:]
-
-            predict_boxes_tran = tf.concat([tf.add(tf.nn.sigmoid(predict_coord[:, :, :, :2]), off_set_centroids),
-                                        tf.add(predict_coord[:, :, :, 2:], off_set_corners)], 3) 
-            ## predicts coordinates with respect to input images, [Batch_Size, cell_size, cell_size, 18]
-            ## output is offset with respect to centroid, so has to add the centroid coord(top-left corners of every cell)
-            ## see paper section3.2
-
-            dt_x = utils.dist(predict_boxes_tran, labels_coord)
-            confidence = utils.confidence_func(dt_x)
-        return confidence
-
-    def confidence_score(self, predicts, scope='confidence_score'):
+    def confidence_score(self, predicts, confidence, scope='confidence_score'):
         """
         compute the class-specific confidence scores
         see paper section 3.3
@@ -257,8 +236,9 @@ class YOLO6D_net:
             output tensor by net: [batch, cell_size, cell_size, 19+num_class]
         """
         predict_classes = tf.reshape(predicts[:, :, :, 18:-1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_class])
-        predict_conf = tf.reshape(predicts[:, :, :, -1], [self.Batch_Size, self.cell_size, self.cell_size, 1])
-        predict_conf = tf.tile(predict_conf, [1, 1, 1, self.num_class])
-        class_speci_conf_score = tf.multiply(predict_classes, predict_conf)
-        class_speci_conf_score = tf.reduce_mean(class_speci_conf_score, axis=3, keepdims=True)
+        confidence = tf.tile(confidence, [1, 1, 1, self.num_class])
+
+        class_speci_conf_score = tf.multiply(predict_classes, confidence)
+        class_speci_conf_score = tf.reduce_mean(class_speci_conf_score, axis=3, keep_dims=True)
+
         return class_speci_conf_score

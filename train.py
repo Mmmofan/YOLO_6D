@@ -11,7 +11,7 @@ import argparse
 import YOLO6D_net
 import datetime
 import os
-from utils import *
+from utils import utils
 from utils.timer import Timer
 from utils.MeshPly import MeshPly
 import config as cfg
@@ -133,8 +133,8 @@ class Solver(object):
         load_timer.toc()
 
         feed_dict = {self.net.input_images: images, self.net.labels: labels}
-        summary_str, _ = self.sess.run([self.summary_op, self.train_op], feed_dict=feed_dict)
-        
+        summary_str, logit, _ = self.sess.run([self.summary_op, self.net.logit, self.train_op], feed_dict=feed_dict)
+        logit = utils.confidence_thresh(self.net.confidence_score, logit)  #prune tensors with low confidence (< 0.1)
         
 
 

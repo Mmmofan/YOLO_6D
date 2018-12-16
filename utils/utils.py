@@ -15,7 +15,7 @@ def confidence_func(x, name='Confidence func'):
     dth_in_cell_size = tf.constant(cfg.Dth / cfg.CELL_SIZE, dtype=tf.float32)
     param1 = tf.ones_like(x, dtype=tf.float32)
     confidence = (tf.exp(alpha * (param1 - x / dth_in_cell_size))) / (tf.exp(alpha) - param1)
-    confidence = tf.reduce_mean(confidence, 3, keepdims=True)
+    confidence = tf.reduce_mean(confidence, 3, keep_dims=True)
     return confidence
 
 def dist(x1, x2, name='Distance'):
@@ -78,12 +78,11 @@ def postprocess(ouput_tensor, image_shape=(416, 416), threshold=cfg.CONF_THRESHO
     off_set_corners = off_set[:, :, :, 2:]
     predict_boxes_tran = np.concatenate([tf.add(tf.nn.sigmoid(coordinates[:, :, :, :2]), off_set_centroids),
                                         tf.add(coordinates[:, :, :, 2:], off_set_corners)], 3)
-    predict_boxes = np.multiply(predict_boxes_tran, tf.constant(float(cfg.CELL_SIZE)))
+    predict_boxes = np.multiply(predict_boxes_tran, tf.constant(float(cfg.CELL_SIZE)))  ## Coordinates in real images
     
     # Cut the box, assert the box bounding less than 416
     boxes_max_min = np.array([0, 0, 416, 416], dtype=np.float32)
     predict_boxes = bboxes_cut(boxes_max_min, predict_boxes)
-
 
 
 def bboxes_cut(bbox_min_max, bboxes):
@@ -128,12 +127,10 @@ def nms(input_tensor, cscs):
     """
     out_tensor = np.zeros_like(input_tensor)
     cols, rows = [], []
-    for i in range(1, cfg.CELL_SIZE-1, 1):
-        for j in range(1, cfg.CELL_SIZE-1, 1):
-            col = np.argmax(cscs[:, i-1:i+2, j-1:j+2, 0], axis=0)
-            row = np.argmax(cscs[:, i-1:i+2, j-1:j+2, 0], axis=1)
     
     return out_tensor
+
+###############################################################################
 
 def file_lines(thefilepath):
     count = 0
