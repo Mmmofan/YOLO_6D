@@ -64,6 +64,8 @@ class YOLO6D_net:
         self.input_images = tf.placeholder(tf.float32, [None, self.image_size, self.image_size, 3], name='Input')
         self.logit = self._build_net(self.input_images)
         self.labels = tf.placeholder(tf.float32, [None, self.cell_size, self.cell_size, 18 + 1 + self.num_class + 1], name='Labels')
+        self.conf_value = self.confidence
+        self.conf_score = self.confidence_score(self.logit, self.conf_value)
 
         if is_training:
             """
@@ -73,8 +75,6 @@ class YOLO6D_net:
             self.loss_layer(self.logit, self.labels)
             self.total_loss = tf.losses.get_total_loss()
             tf.summary.scalar('Total loss', self.total_loss)
-            self.conf_value = self.confidence
-            self.conf_score = self.confidence_score(self.logit, self.conf_value)
 
     def _build_net(self, input):
         if self.disp:

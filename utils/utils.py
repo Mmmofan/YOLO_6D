@@ -1,15 +1,26 @@
 # -*- coding: utf-8 -*-
+# ---------------------
+# utils for yolo6d
+# @Author: Fan, Mo
+# Email: fmo@nullmax.ai
+# ---------------------
+
 import os
 import tensorflow as tf
 import numpy as np
 import cv2
 import config as cfg
 
-def confidence_func(x, name='Confidence func'):
+def sigmoid_func(x, derivative=False):
+    return x*(1-x) if derivative else 1/(1+np.exp(-x))
+
+def confidence_func(x):
     """
-    input: Two 4-D tensor: [Batch_size, feature_size, feature_size, 18]
-    compute confidence score then concat to original
-    output: A 4-D tensor: [Batch_Size, feature_size, feature_size, 18]
+    Args:
+        A 4-D tensor: [Batch_size, feature_size, feature_size, 18]
+        compute confidence score then concat to original
+    Returns:
+        A 4-D tensor: [Batch_Size, feature_size, feature_size, 18]
     """
     alpha = tf.constant(cfg.ALPHA, dtype=tf.float32)
     dth_in_cell_size = tf.constant(cfg.Dth / cfg.CELL_SIZE, dtype=tf.float32)
@@ -18,7 +29,7 @@ def confidence_func(x, name='Confidence func'):
     confidence = tf.reduce_mean(confidence, 3, keep_dims=True)
     return confidence
 
-def dist(x1, x2, name='Distance'):
+def dist(x1, x2):
     """
     Args:
         x1: 4-D tensor, [batch_size, cell_size, cell_size, 18]
@@ -33,9 +44,9 @@ def dist(x1, x2, name='Distance'):
                         x2[:, :, :, 8], x2[:, :, :, 10], x2[:, :, :, 12], x2[:, :, :, 14], x2[:, :, :, 16]], 3)
     gt_y = tf.stack([x2[:, :, :, 1], x2[:, :, :, 3], x2[:, :, :, 5], x2[:, :, :, 7],  
                         x2[:,:,:,9], x2[:,:,:,11], x2[:,:,:,13], x2[:,:,:,15], x2[:,:,:,17]], 3)
-    dist = tf.sqrt(tf.add(tf.square(predict_x - gt_x), tf.square(predict_y - gt_y)))
+    distance = tf.sqrt(tf.add(tf.square(predict_x - gt_x), tf.square(predict_y - gt_y)))
     ### dist: 4-D tensor [batch_size, cell_size, cell_size, 9]
-    return dist
+    return distance
 
 def preprocess_image(images, image_size=(416, 416)):
     """
@@ -57,7 +68,7 @@ def postprocess(ouput_tensor, image_shape=(416, 416), threshold=cfg.CONF_THRESHO
     """
     Args:
         output_tensor: computed by net of shape [batch, cell_size, cell_size, 19+num_class]
-    
+        trans to Numpy array first!
     Returns:
         tensors which have coords in real images
     """
@@ -69,34 +80,20 @@ def postprocess(ouput_tensor, image_shape=(416, 416), threshold=cfg.CONF_THRESHO
     off_set = np.transpose(np.reshape(np.array(
                                 [np.arange(cfg.CELL_SIZE)] * cfg.CELL_SIZE * 18 * cfg.BOXES_PER_CELL),
                                 (18, cfg.CELL_SIZE, cfg.CELL_SIZE)),
-                                (1, 2, 0))
-    off_set = np.array(off_set).astype(np.float32)
+                                (1, 2, 0)).astype(np.float32)
     off_set = np.reshape(off_set, [1, cfg.CELL_SIZE, cfg.CELL_SIZE, 18 * cfg.BOXES_PER_CELL])
     off_set = np.tile(off_set, [cfg.BATCH_SIZE, 1, 1, 1])
     ## off_set shape : [Batch_Size, cell_size, cell_size, 18 * boxes_per_cell]
     off_set_centroids = off_set[:, :, :, :2]
     off_set_corners = off_set[:, :, :, 2:]
-    predict_boxes_tran = np.concatenate([tf.add(tf.nn.sigmoid(coordinates[:, :, :, :2]), off_set_centroids),
-                                        tf.add(coordinates[:, :, :, 2:], off_set_corners)], 3)
-    predict_boxes = np.multiply(predict_boxes_tran, tf.constant(float(cfg.CELL_SIZE)))  ## Coordinates in real images
-    
-    # Cut the box, assert the box bounding less than 416
-    boxes_max_min = np.array([0, 0, 416, 416], dtype=np.float32)
-    predict_boxes = bboxes_cut(boxes_max_min, predict_boxes)
+    predict_boxes_tran = np.concatenate([sigmoid_func(coordinates[:, :, :, :2]) + off_set_centroids,
+                                        coordinates[:, :, :, 2:] + off_set_corners], 3)
+    predict_boxes = np.multiply(predict_boxes_tran, float(cfg.CELL_SIZE))  ## Coordinates in real images
 
+    # Cut the box, assert the boxes' bounding less than 416
+    predict_boxes[predict_boxes>416] = 416
+    predict_boxes[predict_boxes<0] =0
 
-def bboxes_cut(bbox_min_max, bboxes):
-    #unfinish
-    bboxes = np.copy(bboxes)
-    bboxes = np.transpose(bboxes)
-    bbox_min_max= np.transpose(bbox_min_max)
-    #cut the boxes
-    bboxes[0] = np.maximum(bboxes[0], bbox_min_max[0]) #xmin
-    bboxes[1] = np.maximum(bboxes[1], bbox_min_max[1]) #ymin
-    bboxes[2] = np.minimum(bboxes[2], bbox_min_max[2]) #xmax
-    bboxes[3] = np.minimum(bboxes[3], bbox_min_max[3]) #ymax
-    bboxes = np.transpose(bboxes)
-    return bboxes
 
 def confidence_thresh(cscs, predicts, threshold=cfg.CONF_THRESHOLD):
     """
@@ -108,12 +105,10 @@ def confidence_thresh(cscs, predicts, threshold=cfg.CONF_THRESHOLD):
     Return:
         output: a numpy feature tensor  [batch_size, cell_size, cell_size, 18]
     """
-    out_tensor = np.zeros_like(predicts)
-    for i in range(cfg.CELL_SIZE):
-        for j in range(cfg.CELL_SIZE):
-            for k in range(cfg.BATCH_SIZE):
-                if cscs[k][i][j][0] > threshold:
-                    out_tensor[k][i][j] = predicts[k][i][j]
+    out_tensor = np.ones_like(cscs, dtype=np.float32)  # initialize out_tensor
+    out_tensor[cscs <= threshold] = 0
+    out_tensor = np.tile(out_tensor, [1, 1, 1, predicts.shape[3]])  # expand out_tensor to the shape of predicts
+    out_tensor = np.multiply(out_tensor, predicts) # multiply element-wise, when outtensor number is 0 means it will be pruned
     return out_tensor
 
 def nms(input_tensor, cscs):
@@ -129,6 +124,8 @@ def nms(input_tensor, cscs):
     cols, rows = [], []
     
     return out_tensor
+
+#def compute_average(input_tensor, cscs):
 
 ###############################################################################
 

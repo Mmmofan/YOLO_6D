@@ -134,7 +134,10 @@ class Solver(object):
 
         feed_dict = {self.net.input_images: images, self.net.labels: labels}
         summary_str, logit, _ = self.sess.run([self.summary_op, self.net.logit, self.train_op], feed_dict=feed_dict)
-        logit = utils.confidence_thresh(self.net.confidence_score, logit)  #prune tensors with low confidence (< 0.1)
+        confidence_score = self.net.conf_score
+        confidence_score = confidence_score.eval(session=self.sess)  ## Convert to Numpy array
+        predicts = logit.eval(session=self.sess)  ##Convert to Numpy array
+        logit = utils.confidence_thresh(confidence_score, predicts)  #prune tensors with low confidence (< 0.1)
         
 
 
