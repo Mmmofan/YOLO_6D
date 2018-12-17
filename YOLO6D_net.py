@@ -100,7 +100,7 @@ class YOLO6D_net:
         x = self.conv(x, 1, 1, 256, num=12)
         x = self.conv(x, 3, 1, 512, num=13)
         x_ps = self.conv(x, 1, 1, 64, num=14)    #add a pass through layer
-        x_ps = self.conv(x_ps, 3, 2, 256, num=15)   
+        x_ps = self.reorg(x_ps)
         x = self.max_pool_layer(x, name='MaxPool5')    #continue straight layer
         x = self.conv(x, 3, 1, 1024, num=16)
         x = self.conv(x, 1, 1, 512, num=17)
@@ -130,6 +130,20 @@ class YOLO6D_net:
                 x = self.bn(x)
         return x
 
+    def reorg(self, x, strides=2):
+        """
+        Reorg the tensor(half the size, double the depth)
+        """
+        x_shape = x.get_shape()
+        B, W, H, C = x_shape[0], x_shape[1], x_shape[2], x_shape[3]
+        assert(W % strides == 0)
+        assert(H % strides == 0)
+        Ws = int(W / strides)
+        Hs = int(H / strides)
+        Cs = int(C * strides * strides)
+        x = tf.reshape(x, [B, Ws, Hs, Cs])
+        return x
+
     def conv_layer(self, x, kernel_size, stride, filters, name, pad='SAME'):
         x_shape = x.get_shape()
         x_channels = x_shape[3].value
@@ -147,7 +161,6 @@ class YOLO6D_net:
         input are 2 tensors from different conv_layer
         """
         x_list = [x1, x2]
-        dims = tf.constant(3, dtype=tf.int32)
         y = tf.concat(x_list, 3, name=name)
         return y
 
@@ -222,8 +235,8 @@ class YOLO6D_net:
 
             ## coordinates loss
             coord_loss = tf.losses.mean_squared_error(labels_coord, predict_boxes_tran, weights=response, scope='Coord_Loss')
-            ## confidence loss, the loss between output confidence value and real confidence
-            conf_loss = tf.losses.mean_squared_error(labels_conf, self.confidence, weights=conf_mask, scope='Conf_Loss')
+            ## confidence loss, the loss between output confidence value and compute confidence
+            conf_loss = tf.losses.mean_squared_error(self.confidence, predict_conf, weights=conf_mask, scope='Conf_Loss')
             ## classification loss
             class_loss = tf.losses.softmax_cross_entropy(labels_classes, predict_classes, weights=self.class_scale, scope='Class_Loss')
 
