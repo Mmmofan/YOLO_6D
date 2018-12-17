@@ -2,7 +2,7 @@
 # ---------------------
 # configuration for yolo-6d
 # @Author: Fan, Mo
-# Email: fmo@nullmax.ai
+# @Email: fmo@nullmax.ai
 # ---------------------
 
 import os

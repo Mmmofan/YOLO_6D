@@ -2,7 +2,7 @@
 # ---------------------
 # utils for yolo6d
 # @Author: Fan, Mo
-# Email: fmo@nullmax.ai
+# @Email: fmo@nullmax.ai
 # ---------------------
 
 import os
@@ -136,7 +136,6 @@ def nms(input_tensor, cscs):
             res[:, k+i-1, l+j-1, :] = 1
     res = np.tile(res, [1, 1, 1, 18])
     out_tensor = np.multiply(res, input_tensor)
-    
     return out_tensor
 
 def compute_average(orig_tensor, cscs, out_tensor):
@@ -144,6 +143,9 @@ def compute_average(orig_tensor, cscs, out_tensor):
     return out_tensor
 
 def pnp(points_3D, points_2D, cameraMatrix):
+    """
+    Use PnP algorithm compute 6D pose
+    """
     try:
         distCoeffs = pnp.distCoeffs
     except:
@@ -159,7 +161,6 @@ def pnp(points_3D, points_2D, cameraMatrix):
     R, _ = cv2.Rodrigues(R_exp)
     # Rt = np.c_[R, t]
     return R, t
-
 
 ###############################################################################
 

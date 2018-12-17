@@ -132,7 +132,7 @@ class Solver(object):
         load_timer = Timer()
 
         load_timer.tic()
-        images, labels = self.data.get()
+        images, labels = self.data.test_get()
         load_timer.toc()
 
         feed_dict = {self.net.input_images: images, self.net.labels: labels}
