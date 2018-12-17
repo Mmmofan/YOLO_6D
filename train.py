@@ -6,20 +6,23 @@
 # ---------------------
 
 from __future__ import print_function
-import sys
+
 import argparse
-import YOLO6D_net
 import datetime
 import os
-from utils import utils
-from utils.timer import Timer
-from utils.MeshPly import MeshPly
-import config as cfg
+import sys
+
 import numpy as np
 import tensorflow as tf
-from YOLO6D_net import YOLO6D_net
-#from Data import Data
 
+import config as cfg
+import YOLO6D_net
+from utils import utils
+from utils.MeshPly import MeshPly
+from utils.timer import Timer
+from YOLO6D_net import YOLO6D_net
+
+#from Data import Data
 
 
 class Solver(object):
@@ -133,12 +136,13 @@ class Solver(object):
         load_timer.toc()
 
         feed_dict = {self.net.input_images: images, self.net.labels: labels}
-        summary_str, logit, _ = self.sess.run([self.summary_op, self.net.logit, self.train_op], feed_dict=feed_dict)
+        test_summary_str, logit, _ = self.sess.run([self.summary_op, self.net.logit, self.train_op], feed_dict=feed_dict) # check
         confidence_score = self.net.conf_score
-        confidence_score = confidence_score.eval(session=self.sess)  ## Convert to Numpy array
-        predicts = logit.eval(session=self.sess)  ##Convert to Numpy array
-        logit = utils.confidence_thresh(confidence_score, predicts)  #prune tensors with low confidence (< 0.1)
-        
+        confidence_score = confidence_score.eval(session=self.sess)  ## confidence_score tensor, convert to Numpy array
+        predicts = logit.eval(session=self.sess)  ##Predict tensor, convert to Numpy array
+        logit = utils.confidence_thresh(confidence_score, predicts)  # prune tensors with low confidence (< 0.1)
+        logit = utils.nms(logit, confidence_score)  # get the maximum of 3x3 neighborhood
+        #logit = utils.compute_average(predicts, confidence_score, logit)  # compute weighted average of 3x3 neighborhood
 
 
     def save_config(self):

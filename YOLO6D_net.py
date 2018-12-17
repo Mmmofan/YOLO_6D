@@ -5,11 +5,14 @@
 # @Email: fmo@nullmax.ai
 # ---------------------
 
-import tensorflow as tf
-import numpy as np
-from utils import utils
 import sys
+
+import numpy as np
+import tensorflow as tf
+
 import config as cfg
+from utils import utils
+
 
 """
 5BTM 51C9 3791 5TKL

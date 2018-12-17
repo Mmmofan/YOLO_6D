@@ -6,12 +6,18 @@
 # ---------------------
 
 import os
-import tensorflow as tf
-import numpy as np
+
 import cv2
+import numpy as np
+import tensorflow as tf
+
 import config as cfg
 
+
 def sigmoid_func(x, derivative=False):
+    """
+    Compute sigmoid of x element-wise
+    """
     return x*(1-x) if derivative else 1/(1+np.exp(-x))
 
 def confidence_func(x):
@@ -91,8 +97,8 @@ def postprocess(ouput_tensor, image_shape=(416, 416), threshold=cfg.CONF_THRESHO
     predict_boxes = np.multiply(predict_boxes_tran, float(cfg.CELL_SIZE))  ## Coordinates in real images
 
     # Cut the box, assert the boxes' bounding less than 416
-    predict_boxes[predict_boxes>416] = 416
-    predict_boxes[predict_boxes<0] =0
+    predict_boxes[predict_boxes > 416] = 416
+    predict_boxes[predict_boxes < 0] = 0
 
 
 def confidence_thresh(cscs, predicts, threshold=cfg.CONF_THRESHOLD):
@@ -120,12 +126,40 @@ def nms(input_tensor, cscs):
     Return:
         output: a numpy feature tensor  [batch_size, cell_size, cell_size, 18]
     """
-    out_tensor = np.zeros_like(input_tensor)
-    cols, rows = [], []
+    cols, rows= [], []
+    res = np.zeros_like(cscs, dtype=np.float32)
+    for i in range(1, input_tensor.shape[1]-1, 1):
+        for j in range(1, input_tensor.shape[2]-1, 1):
+            temp = cscs[:, i-1:i+2, j-1:j+2, :]
+            temp_max = np.argmax(temp)
+            _, k, l, __ = np.where(temp==temp_max)
+            res[:, k+i-1, l+j-1, :] = 1
+    res = np.tile(res, [1, 1, 1, 18])
+    out_tensor = np.multiply(res, input_tensor)
     
     return out_tensor
 
-#def compute_average(input_tensor, cscs):
+def compute_average(orig_tensor, cscs, out_tensor):
+
+    return out_tensor
+
+def pnp(points_3D, points_2D, cameraMatrix):
+    try:
+        distCoeffs = pnp.distCoeffs
+    except:
+        distCoeffs = np.zeros((8,1), dtype='float32')
+
+    assert points_2D.shape[0] == points_2D.shape[0], 'points 3D and points 2D must have same number of vertices'
+
+    _, R_exp, t = cv2.solvePnP(points_3D,
+                                # points_2D,
+                                np.ascontiguousarray(points_2D[:, :2]).reshape((-1,1,2)),
+                                cameraMatrix,
+                                distCoeffs)
+    R, _ = cv2.Rodrigues(R_exp)
+    # Rt = np.c_[R, t]
+    return R, t
+
 
 ###############################################################################
 
