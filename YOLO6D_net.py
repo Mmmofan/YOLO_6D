@@ -63,11 +63,10 @@ class YOLO6D_net:
                                     (18, self.cell_size, self.cell_size)),
                                     (1, 2, 0))
 
-        self.confidence = None
         self.input_images = tf.placeholder(tf.float32, [None, self.image_size, self.image_size, 3], name='Input')
         self.logit = self._build_net(self.input_images)
         self.labels = tf.placeholder(tf.float32, [None, self.cell_size, self.cell_size, 18 + 1 + self.num_class + 1], name='Labels')
-        self.conf_value = self.confidence
+        self.conf_value = tf.reshape(self.logit[:, :, :, -1], [self.Batch_Size, self.cell_size, self.cell_size, 1])
         self.conf_score = self.confidence_score(self.logit, self.conf_value)
 
         if is_training:
@@ -99,19 +98,20 @@ class YOLO6D_net:
         x = self.conv(x, 3, 1, 512, num=11)
         x = self.conv(x, 1, 1, 256, num=12)
         x = self.conv(x, 3, 1, 512, num=13)
-        x_ps = self.conv(x, 1, 1, 64, num=14)    #add a pass through layer
-        x_ps = self.reorg(x_ps)
-        x = self.max_pool_layer(x, name='MaxPool5')    #continue straight layer
-        x = self.conv(x, 3, 1, 1024, num=16)
-        x = self.conv(x, 1, 1, 512, num=17)
-        x = self.conv(x, 3, 1, 1024, num=18)
-        x = self.conv(x, 1, 1, 512, num=19)
+        x_ps = self.conv(x, 1, 1, 64, num=14)    # add a pass through layer
+        #x_ps = self.reorg(x_ps)  # can't be use for now
+        x_ps = self.conv(x_ps, 3, 2, 256, num=0)
+        x = self.max_pool_layer(x, name='MaxPool5')    # continue straight layer
+        x = self.conv(x, 3, 1, 1024, num=15)
+        x = self.conv(x, 1, 1, 512, num=16)
+        x = self.conv(x, 3, 1, 1024, num=17)
+        x = self.conv(x, 1, 1, 512, num=18)
+        x = self.conv(x, 3, 1, 1024, num=19)
         x = self.conv(x, 3, 1, 1024, num=20)
         x = self.conv(x, 3, 1, 1024, num=21)
-        x = self.conv(x, 3, 1, 1024, num=22)
         x = self.merge_layer(x, x_ps, name='Merge')
-        x = self.conv(x, 3, 1, 1024, num=23)
-        x = self.conv(x, 1, 1, 18 + 1 + self.num_class, num=24) ## 9 points 1 confidence C classes
+        x = self.conv(x, 3, 1, 1024, num=22)
+        x = self.conv(x, 1, 1, 18 + 1 + self.num_class, num=23) ## 9 points 1 confidence C classes
 
         if self.disp:
             print("----building network complete----")
@@ -135,13 +135,13 @@ class YOLO6D_net:
         Reorg the tensor(half the size, double the depth)
         """
         x_shape = x.get_shape()
-        B, W, H, C = x_shape[0], x_shape[1], x_shape[2], x_shape[3]
+        B, W, H, C = x_shape[0].value, x_shape[1].value, x_shape[2].value, x_shape[3].value
         assert(W % strides == 0)
         assert(H % strides == 0)
         Ws = int(W / strides)
         Hs = int(H / strides)
         Cs = int(C * strides * strides)
-        x = tf.reshape(x, [B, Ws, Hs, Cs])
+        #x = tf.reshape(x, [B, Ws, Hs, Cs])
         return x
 
     def conv_layer(self, x, kernel_size, stride, filters, name, pad='SAME'):

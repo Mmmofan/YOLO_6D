@@ -32,7 +32,8 @@ class Solver(object):
         self.net = net
         self.data = data
         self.batch_size = cfg.BATCH_SIZE
-        self.weight_file = cfg.WEIGHTS_FILE
+        self.weight_file = None
+        #self.weight_file = cfg.WEIGHTS_FILE
         self.max_iter = cfg.MAX_ITER
         self.inital_learning_rate = cfg.LEARNING_RATE
         self.decay_steps = cfg.DECAY_STEP
@@ -164,12 +165,17 @@ def update_config_paths(data_dir, weights_file):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--pre', default=None, type=bool)
     parser.add_argument('--weights', default="YOLO_6D.ckpt", type=str)
     parser.add_argument('--data_dir', default="data", type=str)
     parser.add_argument('--threshold', default=0.2, type=float)
     parser.add_argument('--iou_threshold', default=0.5, type=float)
-    parser.add_argument('--gpu', default='', type=str)
+    parser.add_argument('--gpu', default='1', type=str)
     args = parser.parse_args()
+    
+    if args.pre:
+        cfg.CONF_OBJ_SCALE = 0.0
+        cfg.CONF_NOOBJ_SCALE = 0.0
 
     if args.gpu is not None:
         cfg.GPU = args.gpu
