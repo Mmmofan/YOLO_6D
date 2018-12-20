@@ -14,13 +14,13 @@ Path and Dataset parameters
 DISP = True
 
 ##Files parameters
-#DATA_DIR = './data'  ##for windows
-DATA_DIR = '/home/user/2-git/YOLO_6D/data'  ## for ubuntu
+DATA_DIR = 'data'  ##for windows
+#DATA_DIR = '/home/user/2-git/YOLO_6D/data'  ## for ubuntu
 DATASETS_DIR = os.path.join(DATA_DIR, 'datasets')
 CACHE_DIR = os.path.join(DATASETS_DIR, 'cache')
 OUTPUT_DIR = os.path.join(DATASETS_DIR, 'output')
 WEIGHTS_DIR = os.path.join(DATASETS_DIR, 'weights')
-WEIGHTS_FILE = os.path.join(DATA_DIR, 'weights', 'yolo_6d.ckpt')
+WEIGHTS_FILE = os.path.join(WEIGHTS_DIR, 'weights', 'yolo_6d.ckpt')
 
 ##Network parameters
 NUM_CLASSES = 20

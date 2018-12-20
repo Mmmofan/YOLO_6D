@@ -66,6 +66,8 @@ class YOLO6D_net:
         self.input_images = tf.placeholder(tf.float32, [None, self.image_size, self.image_size, 3], name='Input')
         self.logit = self._build_net(self.input_images)
         self.labels = tf.placeholder(tf.float32, [None, self.cell_size, self.cell_size, 18 + 1 + self.num_class + 1], name='Labels')
+        self.confidence = tf.reshape(self.logit[:, :, :, -1], [self.Batch_Size, self.cell_size, self.cell_size, 1] )
+        self.conf_value = self.confidence
         self.conf_value = tf.reshape(self.logit[:, :, :, -1], [self.Batch_Size, self.cell_size, self.cell_size, 1])
         self.conf_score = self.confidence_score(self.logit, self.conf_value)
 
@@ -98,15 +100,14 @@ class YOLO6D_net:
         x = self.conv(x, 3, 1, 512, num=11)
         x = self.conv(x, 1, 1, 256, num=12)
         x = self.conv(x, 3, 1, 512, num=13)
-        x_ps = self.conv(x, 1, 1, 64, num=14)    # add a pass through layer
-        #x_ps = self.reorg(x_ps)  # can't be use for now
-        x_ps = self.conv(x_ps, 3, 2, 256, num=0)
-        x = self.max_pool_layer(x, name='MaxPool5')    # continue straight layer
-        x = self.conv(x, 3, 1, 1024, num=15)
-        x = self.conv(x, 1, 1, 512, num=16)
-        x = self.conv(x, 3, 1, 1024, num=17)
-        x = self.conv(x, 1, 1, 512, num=18)
-        x = self.conv(x, 3, 1, 1024, num=19)
+        x_ps = self.conv(x, 1, 1, 64, num=14)    #add a pass through layer
+        x_ps = self.reorg(x_ps)
+        #x_ps = self.conv(x_ps, 3, 2, 256, num=15)
+        x = self.max_pool_layer(x, name='MaxPool5')    #continue straight layer
+        x = self.conv(x, 3, 1, 1024, num=16)
+        x = self.conv(x, 1, 1, 512, num=17)
+        x = self.conv(x, 3, 1, 1024, num=18)
+        x = self.conv(x, 1, 1, 512, num=19)
         x = self.conv(x, 3, 1, 1024, num=20)
         x = self.conv(x, 3, 1, 1024, num=21)
         x = self.merge_layer(x, x_ps, name='Merge')
@@ -132,7 +133,7 @@ class YOLO6D_net:
 
     def reorg(self, x, strides=2):
         """
-        Reorg the tensor(half the size, double the depth)
+        Reorg the tensor(half the size, 4* the depth)
         """
         x_shape = x.get_shape()
         B, W, H, C = x_shape[0].value, x_shape[1].value, x_shape[2].value, x_shape[3].value
@@ -141,7 +142,8 @@ class YOLO6D_net:
         Ws = int(W / strides)
         Hs = int(H / strides)
         Cs = int(C * strides * strides)
-        #x = tf.reshape(x, [B, Ws, Hs, Cs])
+        #x.set_shape([B, Ws, Hs, Cs])
+        x = tf.reshape(x, shape=[-1, Ws, Hs, Cs])
         return x
 
     def conv_layer(self, x, kernel_size, stride, filters, name, pad='SAME'):
