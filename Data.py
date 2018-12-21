@@ -16,49 +16,59 @@ import config as cfg
 
 class Data(object):
     def __init__(self, pre=False):
+        self.pre = pre
         self.max_num = 1000
         self.tfrecords_file_num = 1
         self.next_images = None
         self.next_labels = None
         self.train_init_op = None
+        self.trainrecords = None
+        self.testrecords = None
+        self.total_file_num = 0
+        self.each_process_file_num = 0
 
         if pre:
-            self.makecsv()
-            with open('imagenet_trian.csv', 'r') as trainfile:
-                self.trainrecords = trainfile.readlines()
-            self.total_file_num = len(self.trainrecords)
+            self.preprocess_data()
 
-            # for 4 cpus, each process 1 lsit
-            self.each_process_file_num = int(self.total_file_num / 4.0)
-            list1 = self.trainrecords[:self.each_process_file_num]
-            lsit2 = self.trainrecords[self.each_process_file_num:2*self.each_process_file_num]
-            list3 = self.trainrecords[2*self.each_process_file_num:3*self.each_process_file_num]
-            list4 = self.trainrecords[3*self.each_process_file_num:]
 
-            # create 4 queues, 4 sub processes
-            q1 = Queue()
-            q2 = Queue()
-            q3 = Queue()
-            q4 = Queue()
-            p1 = Process(target=gen_tfrecord, args=(list1, q1, ))
-            p2 = Process(target=gen_tfrecord, args=(lsit2, q2, ))
-            p3 = Process(target=gen_tfrecord, args=(list3, q3, ))
-            p4 = Process(target=gen_tfrecord, args=(list4, q4, ))
-            p_list = [p1, p2, p3, p4]
-            _ = map(Process.start, p_list)
+    def preprocess_data(self):
+        # generate .csv files
+        self.makecsv()
+
+        # transfer training data
+        with open('imagenet_trian.csv', 'r') as trainfile:
+            self.trainrecords = trainfile.readlines()
+        self.total_file_num = len(self.trainrecords)
+        # for 4 cpus, each process 1 lsit
+        self.each_process_file_num = int(self.total_file_num / 4.0)
+        list1 = self.trainrecords[:self.each_process_file_num]
+        lsit2 = self.trainrecords[self.each_process_file_num:2*self.each_process_file_num]
+        list3 = self.trainrecords[2*self.each_process_file_num:3*self.each_process_file_num]
+        list4 = self.trainrecords[3*self.each_process_file_num:]
+        # create 4 queues, 4 sub processes
+        q1 = Queue()
+        q2 = Queue()
+        q3 = Queue()
+        q4 = Queue()
+        p1 = Process(target=gen_tfrecord, args=(list1, q1, ))
+        p2 = Process(target=gen_tfrecord, args=(lsit2, q2, ))
+        p3 = Process(target=gen_tfrecord, args=(list3, q3, ))
+        p4 = Process(target=gen_tfrecord, args=(list4, q4, ))
+        p_list = [p1, p2, p3, p4]
+        _ = map(Process.start, p_list)
         
-            #父进程循环查询队列的消息，并且每10秒更新一次
-            progress_str = 'PID:%i Processing:%i/%i | PID:%i Processing:%i/%i | PID:%i Processing:%i/%i | PID:%i Processing:%i/%i \r'
-            while(True):
-                try:
-                    msg1 = q1.get()
-                    msg2 = q2.get()
-                    msg3 = q3.get()
-                    msg4 = q4.get()
-                    print(progress_str % (msg1[0],msg1[1],len(list1),msg2[0],msg2[1],len(list2),msg3[0],msg3[1],len(list3),msg4[0],msg4[1],len(list4)))
-                    time.sleep(10)
-                except:
-                    break
+        #父进程循环查询队列的消息，并且每10秒更新一次
+        #progress_str = 'PID:%i Processing:%i/%i | PID:%i Processing:%i/%i | PID:%i Processing:%i/%i | PID:%i Processing:%i/%i \r'
+        #while(True):
+        #    try:
+        #        msg1 = q1.get()
+        #        msg2 = q2.get()
+        #        msg3 = q3.get()
+        #        msg4 = q4.get()
+        #        print(progress_str % (msg1[0],msg1[1],len(list1),msg2[0],msg2[1],len(list2),msg3[0],msg3[1],len(list3),msg4[0],msg4[1],len(list4)))
+        #        time.sleep(10)
+        #    except:
+        #        break
 
     def get(self):
         """
@@ -79,10 +89,14 @@ class Data(object):
         return self.next_images, self.next_labels
 
 
-    #def test_get(self):
+    def test_get(self):
         """
         Get images and labels (tfrecord) for testing
         """
+        with open('imagenet_test.csv', 'r') as testfie:
+            self.testrecords = testfie.readlines()
+        self.total_file_num = len(self.testrecords)
+
         
     def makecsv(self):
         """
