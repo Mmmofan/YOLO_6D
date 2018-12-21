@@ -52,12 +52,12 @@ class YOLO6D_net:
         Input images: [416 * 416 * 3]
         output tensor: [13 * 13 * (18 + 1 + num_classes)]
             self.input_images ==> self.logit
+        Input labels: [batch * 13 * 13 * 20 + num_classes]
         """
         self.boundry_1 = 9 * 2 * self.boxes_per_cell   ## Seperate coordinates
         self.boundry_2 = self.num_class
-        """
-        off_set:  [self.cell_size, self.cell_size, 18]
-        """
+        
+        #off_set:  [self.cell_size, self.cell_size, 18]
         self.off_set = np.transpose(np.reshape(np.array(
                                     [np.arange(self.cell_size)] * self.cell_size * 18 * self.boxes_per_cell),
                                     (18, self.cell_size, self.cell_size)),
@@ -72,10 +72,6 @@ class YOLO6D_net:
         self.conf_score = self.confidence_score(self.logit, self.conf_value)
 
         if is_training:
-            """
-            Input labels struct:
-                [ responsible: 1, 9 points coord: 18, confidence: 1, class number: num_class ]
-            """
             self.loss_layer(self.logit, self.labels)
             self.total_loss = tf.losses.get_total_loss()
             tf.summary.scalar('Total loss', self.total_loss)
@@ -141,7 +137,6 @@ class YOLO6D_net:
         Ws = int(W / strides)
         Hs = int(H / strides)
         Cs = int(C * strides * strides)
-        #x.set_shape([B, Ws, Hs, Cs])
         x = tf.reshape(x, shape=[-1, Ws, Hs, Cs])
         return x
 
