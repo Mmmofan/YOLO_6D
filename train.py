@@ -175,14 +175,14 @@ def main():
     parser.add_argument('--iou_threshold', default=0.5, type=float)
     parser.add_argument('--gpu', default='1', type=str)
     args = parser.parse_args()
-    
+
     if args.pre:
         cfg.CONF_OBJ_SCALE = 0.0
         cfg.CONF_NOOBJ_SCALE = 0.0
 
     if args.gpu is not None:
         cfg.GPU = args.gpu
-    
+
     if args.data_dir != cfg.DATA_DIR:
         update_config_paths(args.data_dir, args.weights)
         
