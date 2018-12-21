@@ -14,8 +14,7 @@ Path and Dataset parameters
 DISP = True
 
 ##Files parameters
-DATA_DIR = 'data'  ##for windows
-#DATA_DIR = '/home/user/2-git/YOLO_6D/data'  ## for ubuntu
+DATA_DIR = 'data'  
 DATASETS_DIR = os.path.join(DATA_DIR, 'datasets')
 CACHE_DIR = os.path.join(DATASETS_DIR, 'cache')
 OUTPUT_DIR = os.path.join(DATASETS_DIR, 'output')
