@@ -102,7 +102,6 @@ class YOLO6D_net:
         x = self.conv(x, 3, 1, 512, num=13)
         x_ps = self.conv(x, 1, 1, 64, num=14)    #add a pass through layer
         x_ps = self.reorg(x_ps)
-        #x_ps = self.conv(x_ps, 3, 2, 256, num=15)
         x = self.max_pool_layer(x, name='MaxPool5')    #continue straight layer
         x = self.conv(x, 3, 1, 1024, num=16)
         x = self.conv(x, 1, 1, 512, num=17)
