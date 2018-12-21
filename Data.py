@@ -15,7 +15,7 @@ import config as cfg
 
 
 class Data(object):
-    def __init__(self, pre=False, phase='train'):
+    def __init__(self, pre=False):
         self.pre = pre
         self.max_num = 1000
         self.tfrecords_file_num = 1
