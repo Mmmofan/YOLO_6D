@@ -74,6 +74,7 @@ class Solver(object):
 
         self.writer.add_graph(self.sess.graph)
 
+
     def train(self):
 
         train_timer = Timer()
@@ -129,6 +130,7 @@ class Solver(object):
                 self.saver.save(self.sess, self.ckpt_file, 
                                 global_step=self.global_step)
 
+
     def test(self):
         load_timer = Timer()
 
@@ -163,9 +165,10 @@ def update_config_paths(data_dir, weights_file):
     cfg.WEIGHTS_DIR = os.path.join(cfg.DATASETS_DIR, 'weights')
     cfg.WEIGHTS_FILE = os.path.join(cfg.WEIGHTS_DIR, weights_file)
 
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--pre', default=None, type=bool)
+    parser.add_argument('--pre', default=False type=bool)
     parser.add_argument('--weights', default="YOLO_6D.ckpt", type=str)
     parser.add_argument('--data_dir', default="data", type=str)
     parser.add_argument('--threshold', default=0.2, type=float)
@@ -186,7 +189,8 @@ def main():
     os.environ['CUDA_VISABLE_DEVICES'] = cfg.GPU
 
     yolo = YOLO6D_net()
-    #datasets = Data()
+
+    #datasets = Data(pre=args.pre)
     datasets = None
     #epochs = datasets.epoch
 
