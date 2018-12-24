@@ -19,10 +19,12 @@ DATASETS_DIR = os.path.join(DATA_DIR, 'datasets')
 CACHE_DIR = os.path.join(DATASETS_DIR, 'cache')
 OUTPUT_DIR = os.path.join(DATASETS_DIR, 'output')
 WEIGHTS_DIR = os.path.join(DATASETS_DIR, 'weights')
-WEIGHTS_FILE = os.path.join(WEIGHTS_DIR, 'weights', 'yolo_6d.ckpt')
+WEIGHTS_FILE = os.path.join(WEIGHTS_DIR, 'yolo_6d.ckpt')
+
+FLIPPED = True
 
 ##Network parameters
-NUM_CLASSES = 20
+NUM_CLASSES = 406
 BATCH_SIZE = 32
 TEST_BATCH_SIZE =64
 WEIGHT_DECAY = 0.0005
@@ -46,8 +48,8 @@ CLASS_SCALE = 1.0
 COORD_SCALE = 1.0
 
 #Training parameters
-GPU = '0'
-LEARNING_RATE = 0.001
+GPU = '1'
+LEARNING_RATE = 0.0001
 DECAY_STEP = 3200  ## 64 * 100
 DECAY_RATE = 0.1
 STAIRCASE = True

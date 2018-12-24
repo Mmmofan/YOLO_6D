@@ -9,14 +9,16 @@ import os
 import random
 from multiprocessing import Process, Queue
 
+import numpy as np
 import tensorflow as tf
 
-import config as cfg
+import yolo.config as cfg
 
 
 class Data(object):
     def __init__(self, pre=False):
         self.pre = pre
+        self.epoch = 1
         self.max_num = 1000
         self.tfrecords_file_num = 1
         self.next_images = None
@@ -57,10 +59,10 @@ class Data(object):
             q2 = Queue()
             q3 = Queue()
             q4 = Queue()
-            p1 = Process(target=gen_tfrecord, args=(list1, q1, phase, ))
-            p2 = Process(target=gen_tfrecord, args=(lsit2, q2, phase, ))
-            p3 = Process(target=gen_tfrecord, args=(list3, q3, phase, ))
-            p4 = Process(target=gen_tfrecord, args=(list4, q4, phase, ))
+            p1 = Process(target=self.gen_tfrecord, args=(list1, q1, phase, ))
+            p2 = Process(target=self.gen_tfrecord, args=(lsit2, q2, phase, ))
+            p3 = Process(target=self.gen_tfrecord, args=(list3, q3, phase, ))
+            p4 = Process(target=self.gen_tfrecord, args=(list4, q4, phase, ))
             p_list = [p1, p2, p3, p4]
             _ = map(Process.start, p_list)
         
@@ -88,15 +90,15 @@ class Data(object):
         file_num = 0
         total_num = len(records)
         writer = tf.python_io.TFRecordWriter("data/datasets/imagenet/tfdata/{}/".format(phase) + str(os.getpid()) + "_" + str(tfrecords_file_num) + ".tfrecord")
-        pid = os.getpid(
+        pid = os.getpid()
  
-       for record in records:
+        for record in records:
             file_num += 1
             fields = record.strip('\n').split(',')
             with open(fields[0], 'rb') as jpgfile:
                 img = jpgfile.read()
             label = np.array(int(fields[1]))
-            ex = make_example(img, label)
+            ex = self.make_example(img, label)
             writer.write(ex.SerializeToString())
             #send messege to parent process after every 100 records made
             if file_num % 100 == 0:
@@ -122,6 +124,7 @@ class Data(object):
             dataset_train = dataset_train.prefetch(cfg.BATCH_SIZE)
             iterator = tf.data.Iterator.from_structure(dataset_train.output_types, dataset_train.output_shapes)
             self.next_images, self.next_labels = iterator.get_next()
+            self.epoch += 1
             self.train_init_op = iterator.make_initializer(dataset_train)
         return self.next_images, self.next_labels
 
@@ -140,6 +143,7 @@ class Data(object):
             datasets_test = datasets_test.prefetch(cfg.BATCH_SIZE)
             iterator = tf.data.Iterator.from_structure(datasets_test.output_types, datasets_test.output_shapes)
             self.next_images, self.next_labels = iterator.get_next()
+            self.epoch += 1
             self.train_init_op = iterator.make_initializer(datasets_test)
         return self.next_images, self.next_labels
 
@@ -177,7 +181,7 @@ class Data(object):
         """
         return tf.train.Example(features=tf.train.Features(feature={
             'image' : tf.train.Feature(bytes_list=tf.train.BytesList(value=[image])),
-            'label' : tf.trian.Feature(int64_lsit=tf.train.Int64List(Value=[label]))
+            'label' : tf.train.Feature(int64_lsit=tf.train.Int64List(Value=[label]))
         }))
 
 

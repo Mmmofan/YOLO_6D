@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 # ---------------------
 # solver file for yolo-6d
@@ -15,25 +16,23 @@ import sys
 import numpy as np
 import tensorflow as tf
 
-import config as cfg
-import YOLO6D_net
-from utils import utils
+import yolo.config as cfg
+from Data_imagenet import Data
 from utils.MeshPly import MeshPly
 from utils.timer import Timer
-from YOLO6D_net import YOLO6D_net
-
-#from Data import Data
+from utils.utils import *
+from yolo.yolo_6d_net import YOLO6D_net
 
 
 class Solver(object):
+
     def __init__(self, net, data):
         #Set parameters for training and testing
 
         self.net = net
         self.data = data
         self.batch_size = cfg.BATCH_SIZE
-        self.weight_file = None
-        #self.weight_file = cfg.WEIGHTS_FILE
+        self.weight_file = cfg.WEIGHTS_FILE
         self.max_iter = cfg.MAX_ITER
         self.inital_learning_rate = cfg.LEARNING_RATE
         self.decay_steps = cfg.DECAY_STEP
@@ -49,7 +48,7 @@ class Solver(object):
         self.variable_to_restore = tf.global_variables()
         self.restorer = tf.train.Saver(self.variable_to_restore, max_to_keep=None)
         self.saver = tf.train.Saver(self.variable_to_restore, max_to_keep=None)
-        self.ckpt_file = os.path.join(self.output_dir, 'save.ckpt')
+        self.ckpt_file = os.path.join(self.output_dir, 'yolo_6d.ckpt')
         self.summary_op = tf.summary.merge_all()
         self.writer = tf.summary.FileWriter(self.output_dir, flush_secs=60)
 
@@ -69,7 +68,7 @@ class Solver(object):
         self.sess = tf.Session(config=config)
         self.sess.run(tf.global_variables_initializer())
         if self.weight_file is not None:
-            print('Restoring weights from: ' + self.weight_file)
+            print('---------Restoring weights from: {}------------'.format(self.weight_file))
             self.restorer.restore(self.sess, self.weight_file)
 
         self.writer.add_graph(self.sess.graph)
@@ -143,9 +142,10 @@ class Solver(object):
         confidence_score = self.net.conf_score
         confidence_score = confidence_score.eval(session=self.sess)  ## confidence_score tensor, convert to Numpy array
         predicts = logit.eval(session=self.sess)  ##Predict tensor, convert to Numpy array
-        logit = utils.confidence_thresh(confidence_score, predicts)  # prune tensors with low confidence (< 0.1)
-        logit = utils.nms(logit, confidence_score)  # get the maximum of 3x3 neighborhood
+        logit = confidence_thresh(confidence_score, predicts)  # prune tensors with low confidence (< 0.1)
+        logit = nms(logit, confidence_score)  # get the maximum of 3x3 neighborhood
         #logit = utils.compute_average(predicts, confidence_score, logit)  # compute weighted average of 3x3 neighborhood
+
 
 
     def save_config(self):
@@ -168,7 +168,7 @@ def update_config_paths(data_dir, weights_file):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--pre', default=False type=bool)
+    parser.add_argument('--pre', default=False, type=bool)
     parser.add_argument('--weights', default="YOLO_6D.ckpt", type=str)
     parser.add_argument('--data_dir', default="data", type=str)
     parser.add_argument('--threshold', default=0.2, type=float)
@@ -190,8 +190,8 @@ def main():
 
     yolo = YOLO6D_net()
 
-    #datasets = Data(pre=args.pre)
-    datasets = None
+    datasets = Data(pre=args.pre)
+    #datasets = None
     #epochs = datasets.epoch
 
     solver = Solver(yolo, datasets)

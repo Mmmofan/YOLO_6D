@@ -10,8 +10,8 @@ import sys
 import numpy as np
 import tensorflow as tf
 
-import config as cfg
-from utils import utils
+import yolo.config as cfg
+from utils.utils import *
 
 
 """
@@ -79,52 +79,94 @@ class YOLO6D_net:
     def _build_net(self, input):
         if self.disp:
             print("--------building network--------")
-        x = self.conv(input, 3, 1, 32, num=1)
-        x = self.max_pool_layer(x, name='MaxPool1')
-        x = self.conv(x, 3, 1, 64, num=2)
-        x = self.max_pool_layer(x, name='MaxPool2')
-        x = self.conv(x, 3, 1, 128, num=3)
-        x = self.conv(x, 1, 1, 64, num=4)
-        x = self.conv(x, 3, 1, 128, num=5)
-        x = self.max_pool_layer(x, name='MaxPool3')
-        x = self.conv(x, 3, 1, 256, num=6)
-        x = self.conv(x, 1, 1, 128, num=7)
-        x = self.conv(x, 3, 1, 256, num=8)
-        x = self.max_pool_layer(x, name='MaxPool4')
-        x = self.conv(x, 3, 1, 512, num=9)
-        x = self.conv(x, 1, 1, 256, num=10)
-        x = self.conv(x, 3, 1, 512, num=11)
-        x = self.conv(x, 1, 1, 256, num=12)
-        x = self.conv(x, 3, 1, 512, num=13)
-        x_ps = self.conv(x, 1, 1, 64, num=14)    #add a pass through layer
+        self.Batch_Norm = True
+        x = self.conv(input, 3, 1, 32, 'leaky', name='0_conv')
+        x = self.max_pool_layer(x, name='1_pool')
+
+        x = self.conv(x, 3, 1, 64, 'leaky', name='2_conv')
+        x = self.max_pool_layer(x, name='3_pool')
+
+        x = self.conv(x, 3, 1, 128, 'leaky', name='4_conv')
+        x = self.conv(x, 1, 1, 64, 'leaky', name='5_conv')
+        x = self.conv(x, 3, 1, 128, 'leaky', name='6_conv')
+        x = self.max_pool_layer(x, name='7_pool')
+
+        x = self.conv(x, 3, 1, 256, 'leaky', name='8_conv')
+        x = self.conv(x, 1, 1, 128, 'leaky', name='9_conv')
+        x = self.conv(x, 3, 1, 256, 'leaky', name='10_conv')
+        x = self.max_pool_layer(x, name='11_pool')
+        
+        x = self.conv(x, 3, 1, 512, 'leaky', name='12_conv')
+        x = self.conv(x, 1, 1, 256, 'leaky', name='13_conv')
+        x = self.conv(x, 3, 1, 512, 'leaky', name='14_conv')
+        x = self.conv(x, 1, 1, 256, 'leaky', name='15_conv')
+        x_16 = self.conv(x, 3, 1, 512, 'leaky', name='16_conv')
+        x = self.max_pool_layer(x_16, name='17_pool')
+
+        x = self.conv(x, 3, 1, 1024, 'leaky', name='18_conv')
+        x = self.conv(x, 1, 1, 512, 'leaky', name='19_conv')
+        x = self.conv(x, 3, 1, 1024, 'leaky', name='20_conv')
+        x = self.conv(x, 1, 1, 512, 'leaky', name='21_conv')
+        x = self.conv(x, 3, 1, 1024, 'leaky', name='22_conv')
+
+        x = self.conv(x, 3, 1, 1024, 'leaky', name='23_conv')
+        x = self.conv(x, 3, 1, 1024, 'leaky', name='24_conv')
+
+        x_ps = self.conv(x_16, 1, 1, 64, 'leaky', name='26_conv')
         x_ps = self.reorg(x_ps)
-        x = self.max_pool_layer(x, name='MaxPool5')    #continue straight layer
-        x = self.conv(x, 3, 1, 1024, num=16)
-        x = self.conv(x, 1, 1, 512, num=17)
-        x = self.conv(x, 3, 1, 1024, num=18)
-        x = self.conv(x, 1, 1, 512, num=19)
-        x = self.conv(x, 3, 1, 1024, num=20)
-        x = self.conv(x, 3, 1, 1024, num=21)
-        x = self.merge_layer(x, x_ps, name='Merge')
-        x = self.conv(x, 3, 1, 1024, num=22)
-        x = self.conv(x, 1, 1, 18 + 1 + self.num_class, num=23) ## 9 points 1 confidence C classes
+        
+        x = tf.concat([x, x_ps], 3)
+
+        x = self.conv(x, 3, 1, 1024, 'leaky', name='29_conv')
+        self.Batch_Norm = False
+        x = self.conv(x, 1, 1, 18 + 1 + self.num_class, 'linear', name='30_conv') ## 9 points 1 confidence C classes
 
         if self.disp:
             print("----building network complete----")
 
         return x
 
-    def conv(self, x, kernel_size, strides, filters, num, pad='SAME'):
+    def conv(self, x, kernel_size, strides, filters, activation, name, pad='SAME'):
         """
-        Conv ==> ReLU ==> Batch_Norm
+        Conv ==>Batch_Norm==>Activation
         """
-        with tf.variable_scope('Conv_%d' %(num)):
-            name = 'Conv{}'.format(num)
-            x = self.conv_layer(x, kernel_size, strides, filters, pad='SAME', name=name)
-            x = self.activation(x)
-            if self.Batch_Norm:
-                x = self.bn(x)
+        #with tf.variable_scope('Conv_%d' %(num)):
+            #name = 'Conv{}'.format(num)
+        x = self.conv_layer(x, kernel_size, strides, filters, name=name, pad='SAME')
+        if self.Batch_Norm:
+            x = self.activation(x, activation)
         return x
+
+    def conv_layer(self, x, kernel_size, stride, filters, name, pad='SAME'):
+        x_shape = x.get_shape()
+        x_channels = x_shape[3].value
+        weight_shape = [kernel_size, kernel_size, x_channels, filters]
+        bias_shape = [filters]
+        strides = [stride, stride, stride, stride]
+        weight = tf.Variable(tf.truncated_normal(weight_shape, stddev=0.1), name='weight')
+        bias = tf.Variable(tf.constant(0.1, shape=bias_shape), name='biases')
+        #weight = self._get_variable("weight", weight_shape, initializer=tf.truncated_normal_initializer(stddev=0.1))
+        #bias = self._get_variable("bias", bias_shape, initializer=tf.constant_initializer(0.0))
+        y = tf.nn.conv2d(x, weight, strides=strides, padding=pad, name=name)
+        if self.Batch_Norm:
+            depth = filters
+            scale = tf.Variable(tf.ones([depth, ], dtype='float32'), name='scale')
+            shift = tf.Variable(tf.zeros([depth, ], dtype='float32'), name='shift')
+            mean = tf.Variable(tf.ones([depth, ], dtype='float32'), name='rolling_mean')
+            variance = tf.Variable(tf.ones([depth, ], dtype='float32'), name='rolling_variance')
+
+            y = tf.nn.batch_normalization(y, mean, variance, shift, scale, self.EPSILON)
+        y = tf.add(y, bias)
+        return y
+
+    def max_pool_layer(self, x, name):
+        return tf.nn.max_pool(x, ksize=[1,2,2,1], strides=[1,2,2,1], padding=self.MAX_PADDING, name=name)
+
+    def activation(self, x, activation_func, name='activation_func'):
+        if activation_func=='leaky':
+            return tf.nn.relu(x, name='relu')
+        else:
+            return x
 
     def reorg(self, x, strides=2):
         """
@@ -139,40 +181,6 @@ class YOLO6D_net:
         Cs = int(C * strides * strides)
         x = tf.reshape(x, shape=[-1, Ws, Hs, Cs])
         return x
-
-    def conv_layer(self, x, kernel_size, stride, filters, name, pad='SAME'):
-        x_shape = x.get_shape()
-        x_channels = x_shape[3].value
-        weight_shape = [kernel_size, kernel_size, x_channels, filters]
-        bias_shape = [filters]
-        strides = [stride, stride, stride, stride]
-        weight = self._get_variable("weight", weight_shape, initializer=tf.truncated_normal_initializer(stddev=0.1))
-        bias = self._get_variable("bias", bias_shape, initializer=tf.constant_initializer(0.0))
-        y = tf.nn.conv2d(x, weight, strides=strides, padding=pad, name=name)
-        y = tf.add(y, bias, name=name)
-        return y
-
-    def merge_layer(self, x1, x2, name):
-        """
-        input are 2 tensors from different conv_layer
-        """
-        x_list = [x1, x2]
-        y = tf.concat(x_list, 3, name=name)
-        return y
-
-    def max_pool_layer(self, x, name):
-        return tf.nn.max_pool(x, ksize=[1,2,2,1], strides=[1,2,2,1], padding=self.MAX_PADDING, name=name)
-
-    def bn(self, x, name='BN'):
-        axes = [d for d in range(len(x.get_shape()))]
-        gamma = self._get_variable('gamma', [], initializer=tf.constant_initializer(1.0))
-        beta  = self._get_variable('beta', [], initializer=tf.constant_initializer(0.0))
-        x_mean, x_variance = tf.nn.moments(x, axes)
-        y = tf.nn.batch_normalization(x, x_mean, x_variance, beta, gamma, self.EPSILON, name=name)
-        return y
-
-    def activation(self, x, name='activation_func'):
-        return tf.nn.relu(x, name='relu')
 
     def _get_variable(self, name, shape, initializer):
         """
@@ -222,8 +230,8 @@ class YOLO6D_net:
             ## see paper section3.2
 
             ## Calculate confidence (instead of IoU like in YOLOv2)
-            dt_x = utils.dist(predict_boxes_tran, labels_coord)
-            self.confidence = utils.confidence_func(dt_x)
+            dt_x = dist(predict_boxes_tran, labels_coord)
+            self.confidence = confidence_func(dt_x)
 
             object_coef = tf.constant(self.obj_scale, dtype=tf.float32)
             noobject_coef = tf.constant(self.noobj_scale, dtype=tf.float32)

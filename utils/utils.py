@@ -11,7 +11,7 @@ import cv2
 import numpy as np
 import tensorflow as tf
 
-import config as cfg
+import yolo.config as cfg
 
 
 def sigmoid_func(x, derivative=False):
@@ -139,7 +139,9 @@ def nms(input_tensor, cscs):
     return out_tensor
 
 def compute_average(orig_tensor, cscs, out_tensor):
-
+    """
+    Unfinish
+    """
     return out_tensor
 
 def pnp(points_3D, points_2D, cameraMatrix):
