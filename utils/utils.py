@@ -126,15 +126,14 @@ def nms(input_tensor, cscs):
     Return:
         output: a numpy feature tensor  [batch_size, cell_size, cell_size, 18]
     """
-    cols, rows= [], []
     res = np.zeros_like(cscs, dtype=np.float32)
     for i in range(1, input_tensor.shape[1]-1, 1):
         for j in range(1, input_tensor.shape[2]-1, 1):
             temp = cscs[:, i-1:i+2, j-1:j+2, :]
             temp_max = np.argmax(temp)
-            _, k, l, __ = np.where(temp==temp_max)
+            _, k, l, __ = np.where(temp == temp_max)
             res[:, k+i-1, l+j-1, :] = 1
-    res = np.tile(res, [1, 1, 1, 18])
+    res = np.tile(res, [1, 1, 1, input_tensor.shape[3]])
     out_tensor = np.multiply(res, input_tensor)
     return out_tensor
 
@@ -165,6 +164,33 @@ def pnp(points_3D, points_2D, cameraMatrix):
     return R, t
 
 ###############################################################################
+
+def get_all_files(directory):
+    files = []
+
+    for f in os.listdir(directory):
+        if os.path.isfile(os.path.join(directory, f)):
+            files.append(os.path.join(directory, f))
+        else:
+            files.extend(get_all_files(os.path.join(directory, f)))
+    return files
+
+def read_truths(lab_path):
+    if os.path.getsize(lab_path):
+        truths = np.loadtxt(lab_path)
+        truths = truths.reshape(truths.size/21, 21) # to avoid single truth problem
+        return truths
+    else:
+        return np.array([])
+
+def read_truths_args(lab_path, min_box_scale):
+    truths = read_truths(lab_path)
+    new_truths = []
+    for i in range(truths.shape[0]):
+        new_truths.append([truths[i][0], truths[i][1], truths[i][2], truths[i][3], truths[i][4], 
+            truths[i][5], truths[i][6], truths[i][7], truths[i][8], truths[i][9], truths[i][10], 
+            truths[i][11], truths[i][12], truths[i][13], truths[i][14], truths[i][15], truths[i][16], truths[i][17], truths[i][18]])
+    return np.array(new_truths)
 
 def file_lines(thefilepath):
     count = 0

@@ -261,3 +261,10 @@ class YOLO6D_net:
         class_speci_conf_score = tf.reduce_mean(class_speci_conf_score, axis=3, keep_dims=True)
 
         return class_speci_conf_score
+
+    def evaluation(self):
+        """
+        turning network to evaluation mode, turn off Batch Norm(or Dropout)
+        """
+        self.is_training = False
+        self.Batch_Norm = False

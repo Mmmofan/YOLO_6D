@@ -27,9 +27,10 @@ from yolo.yolo_6d_net import YOLO6D_net
 
 class Solver(object):
     
-    def __init__(self, net, data, args):
+    def __init__(self, net, data, arg):
+
         #Set parameters for training and testing
-        self.data_options = read_data_cfg(args.datacfg)
+        self.data_options = read_data_cfg(arg)
         self.trainlist = self.data_options['train']
         self.testlist = self.data_options['test']
         self.gpus = self.data_options['gpu']
@@ -63,8 +64,8 @@ class Solver(object):
 
         self.variable_to_restore = tf.global_variables()
         #print(tf.all_variables())
-        self.restorer = tf.train.Saver(self.variable_to_restore, max_to_keep=None)
-        self.saver = tf.train.Saver(self.variable_to_restore, max_to_keep=None)
+        self.restorer = tf.train.Saver(self.variable_to_restore, max_to_keep=3)
+        self.saver = tf.train.Saver(self.variable_to_restore, max_to_keep=3)
 
         self.ckpt_file = os.path.join(self.output_dir, 'yolo_6d.ckpt')
         self.summary_op = tf.summary.merge_all()
@@ -195,15 +196,18 @@ def update_config_paths(data_dir, weights_file):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--datacfg', default=' ', type=str)
-    parser.add_argument('--pre', default=False, type=bool)
+    parser.add_argument('--datacfg', default='cfg/ape.data', type=str)
     parser.add_argument('--weights', default="YOLO_6D.ckpt", type=str)
+    parser.add_argument('--pre', default=False, type=bool)
     parser.add_argument('--data_dir', default="data", type=str)
     parser.add_argument('--threshold', default=0.2, type=float)
     parser.add_argument('--iou_threshold', default=0.5, type=float)
     parser.add_argument('--gpu', default='1', type=str)
     args = parser.parse_args()
 
+    if len(args.datacfg) == 0:
+        print('No datacfg file specified')
+    
     if args.pre:
         cfg.CONF_OBJ_SCALE = 0.0
         cfg.CONF_NOOBJ_SCALE = 0.0
@@ -222,7 +226,7 @@ def main():
     datasets = Pascal_voc(pre=args.pre)
     epochs = datasets.epoch
 
-    solver = Solver(yolo, datasets, args)
+    solver = Solver(yolo, datasets, args.datacfg)
     print("------start training------")
     #solver.train()
     print("-------training end-------")
