@@ -17,7 +17,8 @@ import numpy as np
 import tensorflow as tf
 
 import yolo.config as cfg
-from Data_imagenet import Data
+from Imagenet import ImageNet
+from pascal_voc import Pascal_voc
 from utils.MeshPly import MeshPly
 from utils.timer import Timer
 from utils.utils import *
@@ -25,10 +26,24 @@ from yolo.yolo_6d_net import YOLO6D_net
 
 
 class Solver(object):
-
-    def __init__(self, net, data):
+    
+    def __init__(self, net, data, args):
         #Set parameters for training and testing
+        self.data_options = read_data_cfg(args.datacfg)
+        self.trainlist = self.data_options['train']
+        self.testlist = self.data_options['test']
+        self.gpus = self.data_options['gpu']
+        self.meshname = self.data_options['mesh']
+        self.num_workers = int(self.data_options['num_workers'])
+        self.backupdir = self.data_options['backup']
+        self.diam = float(self.data_options['diam'])
 
+        self.mesh = MeshPly(self.meshname)
+        self.vertices = np.c_[np.array(self.mesh.vertices), np.ones((len(self.mesh.vertices), 1))].T
+        self.corners3D = get_3D_corners(self.vertices)
+        self.internal_calibration = get_camera_intrinsic()
+
+        self.saveconfig = False
         self.net = net
         self.data = data
         self.batch_size = cfg.BATCH_SIZE
@@ -43,11 +58,14 @@ class Solver(object):
         self.output_dir = os.path.join(cfg.OUTPUT_DIR, datetime.datetime.now().strftime('%Y_%m_%d_%H_%M'))
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
-        self.save_config()
+        if self.saveconfig:
+            self.save_config()
 
         self.variable_to_restore = tf.global_variables()
+        #print(tf.all_variables())
         self.restorer = tf.train.Saver(self.variable_to_restore, max_to_keep=None)
         self.saver = tf.train.Saver(self.variable_to_restore, max_to_keep=None)
+
         self.ckpt_file = os.path.join(self.output_dir, 'yolo_6d.ckpt')
         self.summary_op = tf.summary.merge_all()
         self.writer = tf.summary.FileWriter(self.output_dir, flush_secs=60)
@@ -81,7 +99,7 @@ class Solver(object):
 
         for step in range(1, self.max_iter + 1):
             load_timer.tic()
-            images, labels = self.data.get()
+            images, labels = self.data.next_batches()
             load_timer.toc()
 
             feed_dict = {self.net.input_images: images, self.net.labels: labels}
@@ -134,11 +152,11 @@ class Solver(object):
         load_timer = Timer()
 
         load_timer.tic()
-        images, labels = self.data.test_get()
+        images, labels = self.data.next_batches_test()
         load_timer.toc()
 
         feed_dict = {self.net.input_images: images, self.net.labels: labels}
-        test_summary_str, logit, _ = self.sess.run([self.summary_op, self.net.logit, self.train_op], feed_dict=feed_dict) # check
+        test_summary_str, logit = self.sess.run([self.summary_op, self.net.logit], feed_dict=feed_dict)
         confidence_score = self.net.conf_score
         confidence_score = confidence_score.eval(session=self.sess)  ## confidence_score tensor, convert to Numpy array
         predicts = logit.eval(session=self.sess)  ##Predict tensor, convert to Numpy array
@@ -146,6 +164,15 @@ class Solver(object):
         logit = nms(logit, confidence_score)  # get the maximum of 3x3 neighborhood
         #logit = utils.compute_average(predicts, confidence_score, logit)  # compute weighted average of 3x3 neighborhood
 
+        testing_error_trans = 0.0
+        testing_error_angle = 0.0
+        testing_error_pixel = 0.0
+        testing_samples = 0.0
+        errs_2d = []
+        errs_3d = []
+        errs_trans = []
+        errs_angle = []
+        errs_corner2D = []
 
 
     def save_config(self):
@@ -168,6 +195,7 @@ def update_config_paths(data_dir, weights_file):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--datacfg', default=' ', type=str)
     parser.add_argument('--pre', default=False, type=bool)
     parser.add_argument('--weights', default="YOLO_6D.ckpt", type=str)
     parser.add_argument('--data_dir', default="data", type=str)
@@ -190,11 +218,11 @@ def main():
 
     yolo = YOLO6D_net()
 
-    datasets = Data(pre=args.pre)
-    #datasets = None
-    #epochs = datasets.epoch
+    #datasets = ImageNet(pre=args.pre)
+    datasets = Pascal_voc(pre=args.pre)
+    epochs = datasets.epoch
 
-    solver = Solver(yolo, datasets)
+    solver = Solver(yolo, datasets, args)
     print("------start training------")
     #solver.train()
     print("-------training end-------")

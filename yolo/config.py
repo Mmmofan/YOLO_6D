@@ -24,7 +24,7 @@ WEIGHTS_FILE = os.path.join(WEIGHTS_DIR, 'yolo_6d.ckpt')
 FLIPPED = True
 
 ##Network parameters
-NUM_CLASSES = 406
+NUM_CLASSES = 16
 BATCH_SIZE = 32
 TEST_BATCH_SIZE =64
 WEIGHT_DECAY = 0.0005

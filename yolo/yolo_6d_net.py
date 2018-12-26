@@ -65,7 +65,7 @@ class YOLO6D_net:
 
         self.input_images = tf.placeholder(tf.float32, [None, self.image_size, self.image_size, 3], name='Input')
         self.logit = self._build_net(self.input_images)
-        self.labels = tf.placeholder(tf.float32, [None, self.cell_size, self.cell_size, 18 + 1 + self.num_class + 1], name='Labels')
+        self.labels = tf.placeholder(tf.float32, [None, self.cell_size, self.cell_size, 18 + 1 + self.num_class], name='Labels')
         self.confidence = tf.reshape(self.logit[:, :, :, -1], [self.Batch_Size, self.cell_size, self.cell_size, 1] )
         self.conf_value = self.confidence
         self.conf_value = tf.reshape(self.logit[:, :, :, -1], [self.Batch_Size, self.cell_size, self.cell_size, 1])
@@ -112,14 +112,14 @@ class YOLO6D_net:
         x = self.conv(x, 3, 1, 1024, 'leaky', name='23_conv')
         x = self.conv(x, 3, 1, 1024, 'leaky', name='24_conv')
 
-        x_ps = self.conv(x_16, 1, 1, 64, 'leaky', name='26_conv')
+        x_ps = self.conv(x_16, 1, 1, 64, 'leaky', name='25_conv')
         x_ps = self.reorg(x_ps)
         
         x = tf.concat([x, x_ps], 3)
 
-        x = self.conv(x, 3, 1, 1024, 'leaky', name='29_conv')
+        x = self.conv(x, 3, 1, 1024, 'leaky', name='26_conv')
         self.Batch_Norm = False
-        x = self.conv(x, 1, 1, 18 + 1 + self.num_class, 'linear', name='30_conv') ## 9 points 1 confidence C classes
+        x = self.conv(x, 1, 1, 18 + 1 + self.num_class, 'linear', name='37_conv') ## 9 points 1 confidence C classes
 
         if self.disp:
             print("----building network complete----")
@@ -130,8 +130,7 @@ class YOLO6D_net:
         """
         Conv ==>Batch_Norm==>Activation
         """
-        #with tf.variable_scope('Conv_%d' %(num)):
-            #name = 'Conv{}'.format(num)
+        #with tf.variable_scope('Net'):
         x = self.conv_layer(x, kernel_size, strides, filters, name=name, pad='SAME')
         if self.Batch_Norm:
             x = self.activation(x, activation)
@@ -213,8 +212,8 @@ class YOLO6D_net:
 
             response = tf.reshape(labels[:, :, :, 0], [self.Batch_Size, self.cell_size, self.cell_size, 1])
             labels_coord = tf.reshape(labels[:, :, :, 1:self.boundry_1+1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_coord])
-            labels_classes = tf.reshape(labels[:, :, :, self.boundry_1+1:-1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_class])
-            labels_conf = tf.reshape(labels[:, :, :, -1], [self.Batch_Size, self.cell_size, self.cell_size, 1])
+            labels_classes = tf.reshape(labels[:, :, :, self.boundry_1+1:], [self.Batch_Size, self.cell_size, self.cell_size, self.num_class])
+            #labels_conf = tf.reshape(labels[:, :, :, -1], [self.Batch_Size, self.cell_size, self.cell_size, 1])
 
             off_set = tf.constant(self.off_set, dtype=tf.float32)
             off_set = tf.reshape(off_set, [1, self.cell_size, self.cell_size, 18 * self.boxes_per_cell])
