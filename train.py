@@ -19,6 +19,7 @@ import tensorflow as tf
 import yolo.config as cfg
 from Imagenet import ImageNet
 from pascal_voc import Pascal_voc
+import dataset
 from utils.MeshPly import MeshPly
 from utils.timer import Timer
 from utils.utils import *
@@ -178,11 +179,12 @@ class Solver(object):
         #Iterate throught test examples
         for batch_idx in range(cfg.BATCH_SIZE):
             load_timer.tic()
-# prune tensors with low confidence (< 0.1)
+            # prune tensors with low confidence (< 0.1)
             logit = confidence_thresh(confidence_score[batch_idx], predicts[batch_idx]) 
             # get the maximum of 3x3 neighborhood
             logit_nms = nms(logit, confidence_score[batch_idx])
-            #logit = utils.compute_average(predicts, confidence_score, logit)  # compute weighted average of 3x3 neighborhood
+            # compute weighted average of 3x3 neighborhood
+            #logit = utils.compute_average(predicts, confidence_score, logit)
 
 
     def save_config(self):
