@@ -105,15 +105,15 @@ def confidence_thresh(cscs, predicts, threshold=cfg.CONF_THRESHOLD):
     """
     decide in predicts which to be pruned by threshold through cscs.
     Args:
-        cscs: class-specific confidence score  [batch_size, cell_size, cell_size, 1]
-        predicts: output coord tensor(convert to numpy)  [batch_size, cell_size, cell_size, 18]
+        cscs: class-specific confidence score  with shape: [cell_size, cell_size, 1]
+        predicts: output coord tensor(convert to numpy)  with shape: [cell_size, cell_size, 18]
         threshold: conf_thresh, defined in config.py
     Return:
-        output: a numpy feature tensor  [batch_size, cell_size, cell_size, 18]
+        output: a numpy feature tensor with shape: [cell_size, cell_size, 18]
     """
     out_tensor = np.ones_like(cscs, dtype=np.float32)  # initialize out_tensor
     out_tensor[cscs <= threshold] = 0
-    out_tensor = np.tile(out_tensor, [1, 1, 1, predicts.shape[3]])  # expand out_tensor to the shape of predicts
+    out_tensor = np.tile(out_tensor, [1, 1, predicts.shape[2]])  # expand out_tensor to the shape of predicts
     out_tensor = np.multiply(out_tensor, predicts) # multiply element-wise, when outtensor number is 0 means it will be pruned
     return out_tensor
 
@@ -121,19 +121,19 @@ def nms(input_tensor, cscs):
     """
     get the maximum confidence score tensor from confidence_thresh
     Args:
-        cscs: class-specific confidence score  [batch_size, cell_size, cell_size, 1]
-        input_tensor: out_tensor from confidence_thresh  [batch_size, cell_size, cell_size, 18]
+        cscs: class-specific confidence score with shape: [cell_size, cell_size, 1]
+        input_tensor: out_tensor from confidence_thresh with shape: [cell_size, cell_size, 18]
     Return:
-        output: a numpy feature tensor  [batch_size, cell_size, cell_size, 18]
+        output: a numpy feature tensor with shape: [cell_size, cell_size, 18]
     """
     res = np.zeros_like(cscs, dtype=np.float32)
-    for i in range(1, input_tensor.shape[1]-1, 1):
-        for j in range(1, input_tensor.shape[2]-1, 1):
-            temp = cscs[:, i-1:i+2, j-1:j+2, :]
+    for i in range(1, input_tensor.shape[0]-1, 1):
+        for j in range(1, input_tensor.shape[1]-1, 1):
+            temp = cscs[i-1:i+2, j-1:j+2, :]
             temp_max = np.argmax(temp)
-            _, k, l, __ = np.where(temp == temp_max)
-            res[:, k+i-1, l+j-1, :] = 1
-    res = np.tile(res, [1, 1, 1, input_tensor.shape[3]])
+            k, l, __ = np.where(temp == temp_max)
+            res[k+i-1, l+j-1, :] = 1
+    res = np.tile(res, [1, 1, input_tensor.shape[2]])
     out_tensor = np.multiply(res, input_tensor)
     return out_tensor
 

@@ -150,6 +150,9 @@ class Solver(object):
 
 
     def test(self):
+        # turn off batch norm
+        self.net.evaluation()
+        test_timer = Timer()
         load_timer = Timer()
 
         load_timer.tic()
@@ -157,13 +160,10 @@ class Solver(object):
         load_timer.toc()
 
         feed_dict = {self.net.input_images: images, self.net.labels: labels}
-        test_summary_str, logit = self.sess.run([self.summary_op, self.net.logit], feed_dict=feed_dict)
+        test_summary_str, logit = self.sess.run([self.summary_op, self.net.logit], feed_dict=feed_dict)  # run
         confidence_score = self.net.conf_score
         confidence_score = confidence_score.eval(session=self.sess)  ## confidence_score tensor, convert to Numpy array
-        predicts = logit.eval(session=self.sess)  ##Predict tensor, convert to Numpy array
-        logit = confidence_thresh(confidence_score, predicts)  # prune tensors with low confidence (< 0.1)
-        logit = nms(logit, confidence_score)  # get the maximum of 3x3 neighborhood
-        #logit = utils.compute_average(predicts, confidence_score, logit)  # compute weighted average of 3x3 neighborhood
+        predicts = logit.eval(session=self.sess)  ## Get predict tensor, convert to Numpy array
 
         testing_error_trans = 0.0
         testing_error_angle = 0.0
@@ -175,6 +175,15 @@ class Solver(object):
         errs_angle = []
         errs_corner2D = []
 
+        #Iterate throught test examples
+        for batch_idx in range(cfg.BATCH_SIZE):
+            load_timer.tic()
+# prune tensors with low confidence (< 0.1)
+            logit = confidence_thresh(confidence_score[batch_idx], predicts[batch_idx]) 
+            # get the maximum of 3x3 neighborhood
+            logit_nms = nms(logit, confidence_score[batch_idx])
+            #logit = utils.compute_average(predicts, confidence_score, logit)  # compute weighted average of 3x3 neighborhood
+
 
     def save_config(self):
         with open(os.path.join(self.output_dir, 'config.txt'), 'w') as f:
@@ -184,6 +193,8 @@ class Solver(object):
                     cfg_str = '{}: {}\n'.format(key, cfg_dict[key])
                     f.write(cfg_str)
 
+    def __del__(self):
+        self.sess.close()
 
 def update_config_paths(data_dir, weights_file):
     cfg.DATA_DIR = data_dir
