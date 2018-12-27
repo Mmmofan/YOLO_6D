@@ -19,7 +19,7 @@ import tensorflow as tf
 import yolo.config as cfg
 from Imagenet import ImageNet
 from pascal_voc import Pascal_voc
-import dataset
+#import dataset
 from utils.MeshPly import MeshPly
 from utils.timer import Timer
 from utils.utils import *
@@ -64,6 +64,7 @@ class Solver(object):
             self.save_config()
 
         self.variable_to_restore = tf.global_variables()
+        self.variable_to_restore.pop()
         #print(tf.all_variables())
         self.restorer = tf.train.Saver(self.variable_to_restore, max_to_keep=3)
         self.saver = tf.train.Saver(self.variable_to_restore, max_to_keep=3)
@@ -237,7 +238,7 @@ def main():
 
     #datasets = ImageNet(pre=args.pre)
     datasets = Pascal_voc(pre=args.pre)
-    epochs = datasets.epoch
+    #datasets = None
 
     solver = Solver(yolo, datasets, args.datacfg)
     print("------start training------")
