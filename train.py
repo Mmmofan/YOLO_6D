@@ -12,6 +12,7 @@ import argparse
 import datetime
 import os
 import sys
+import shutil
 
 import numpy as np
 import tensorflow as tf
@@ -45,6 +46,7 @@ class Solver(object):
         self.vertices = np.c_[np.array(self.mesh.vertices), np.ones((len(self.mesh.vertices), 1))].T
         self.corners3D = get_3D_corners(self.vertices)
         self.internal_calibration = get_camera_intrinsic()
+        self.best_acc = -1
         self.testing_errors_trans = []
         self.testing_errors_angle = []
         self.testing_errors_pixel = []
@@ -136,7 +138,23 @@ class Solver(object):
                         load_timer.average_time,
                         train_timer.remain(step, self.max_iter))
                     print(log_str)
+
+                    # test
                     self.test()
+                    print('save training stats to %s/costs.npz' % (self.backupdir))
+                    np.savez(os.path.join(self.backupdir, "costs.npz"),
+                            training_iters=self.global_step,
+                            training_losses=self.net.total_loss,
+                            testing_iters=self.global_step,
+                            testing_accuracies=self.testing_accuracies,
+                            testing_errors_pixel=self.testing_errors_pixel,
+                            testing_errors_angle=self.testing_errors_angle) 
+                    if self.testing_accuracies[-1] > self.best_acc:
+                        self.best_acc = self.testing_accuracies[-1]
+                        print('best model so far!')
+                        print('save weights to %s/yolo6d.ckpt' % (self.backupdir))
+                        self.saver.save(self.sess, '%s/yolo6d.ckpt' % (self.backupdir))
+
                 else:
                     train_timer.tic()
                     summary_str, _ = self.sess.run(
@@ -174,7 +192,7 @@ class Solver(object):
         load_timer.toc()
 
         feed_dict = {self.net.input_images: images, self.net.labels: labels}
-        test_summary_str, logit = self.sess.run([self.summary_op, self.net.logit], feed_dict=feed_dict)  # run
+        logit = self.sess.run([self.net.logit], feed_dict=feed_dict)  # run
         confidence_score = self.net.conf_score
         confidence_score = confidence_score.eval(session=self.sess)  ## confidence_score tensor, convert to Numpy array
         predicts = logit.eval(session=self.sess)  ## Get predict tensor, convert to Numpy array
@@ -192,7 +210,7 @@ class Solver(object):
         all_boxes = []
         #Iterate throught test examples
         for batch_idx in range(cfg.BATCH_SIZE):
-            load_timer.tic()
+            test_timer.tic()
             conf_sco = confidence_score[batch_idx]
             pred = predicts[batch_idx] # 3-D
             truth = truths[batch_idx]
@@ -273,6 +291,7 @@ class Solver(object):
                 testing_error_angle  += angle_dist
                 testing_error_pixel  += pixel_dist
                 testing_samples      += 1
+        test_timer.toc()
         # Compute 2D projection, 6D pose and 5cm5degree scores
         px_threshold = 5
         acc = len(np.where(np.array(errs_2d) <= px_threshold)[0]) * 100. / (len(errs_2d)+eps)
@@ -294,7 +313,8 @@ class Solver(object):
         self.testing_errors_angle.append(testing_error_angle/(nts+eps))
         self.testing_errors_pixel.append(testing_error_pixel/(nts+eps))
         self.testing_accuracies.append(acc)
-
+        test_timer.average_time
+        load_timer.average_time
     
 
 
@@ -349,11 +369,13 @@ def main():
     #datasets = ImageNet(pre=args.pre)
     #datasets = Pascal_voc(pre=args.pre)
     datasets = None
+
     solver = Solver(yolo, datasets)
     #solver = Solver(yolo, datasets, arg=args.datacfg)
     print("------start training------")
-    #solver.train()
+    solver.train()
     print("-------training end-------")
+    shutil.copy2('%s/model.weights' % (solver.backupdir), '%s/model_backup.weights' % (solver.backupdir))
 
 if __name__ == "__main__":
     
