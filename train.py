@@ -28,7 +28,7 @@ from yolo.yolo_6d_net import YOLO6D_net
 
 class Solver(object):
     
-    def __init__(self, net, data, arg):
+    def __init__(self, net, data, arg=None):
 
         #Set parameters for training and testing
         self.data_options = read_data_cfg(arg)
@@ -39,11 +39,16 @@ class Solver(object):
         self.num_workers = int(self.data_options['num_workers'])
         self.backupdir = self.data_options['backup']
         self.diam = float(self.data_options['diam'])
+        self.vx_threshold = self.diam * 0.1
 
         self.mesh = MeshPly(self.meshname)
         self.vertices = np.c_[np.array(self.mesh.vertices), np.ones((len(self.mesh.vertices), 1))].T
         self.corners3D = get_3D_corners(self.vertices)
         self.internal_calibration = get_camera_intrinsic()
+        self.testing_errors_trans = []
+        self.testing_errors_angle = []
+        self.testing_errors_pixel = []
+        self.testing_accuracies = []
 
         self.saveconfig = False
         self.net = net
@@ -63,8 +68,11 @@ class Solver(object):
         if self.saveconfig:
             self.save_config()
 
+        #self.scope = tf.get_variable_scope().original_name_scope
+        #self.options = tf.get_default_graph().get_operations()
         self.variable_to_restore = tf.global_variables()
-        self.variable_to_restore.pop()
+        #last_tensor = tf.get_default_graph().get_tensor_by_name("27_conv:0")
+        #self.variable_to_restore.remove(last_tensor)
         #print(tf.all_variables())
         self.restorer = tf.train.Saver(self.variable_to_restore, max_to_keep=3)
         self.saver = tf.train.Saver(self.variable_to_restore, max_to_keep=3)
@@ -156,9 +164,13 @@ class Solver(object):
         self.net.evaluation()
         test_timer = Timer()
         load_timer = Timer()
+        im_width = 640
+        im_height = 480
+        eps = 1e-5
 
         load_timer.tic()
         images, labels = self.data.next_batches_test()
+        truths = self.data.get_truths() #3-D [Batch, number, params]
         load_timer.toc()
 
         feed_dict = {self.net.input_images: images, self.net.labels: labels}
@@ -177,15 +189,113 @@ class Solver(object):
         errs_angle = []
         errs_corner2D = []
 
+        all_boxes = []
         #Iterate throught test examples
         for batch_idx in range(cfg.BATCH_SIZE):
             load_timer.tic()
+            conf_sco = confidence_score[batch_idx]
+            pred = predicts[batch_idx] # 3-D
+            truth = truths[batch_idx]
+            num_gts = truth[0]
+
             # prune tensors with low confidence (< 0.1)
-            logit = confidence_thresh(confidence_score[batch_idx], predicts[batch_idx]) 
+            logit = confidence_thresh(conf_sco, pred) 
+
             # get the maximum of 3x3 neighborhood
-            logit_nms = nms(logit, confidence_score[batch_idx])
+            logit_nms = nms(logit, conf_sco)
+
             # compute weighted average of 3x3 neighborhood
-            #logit = utils.compute_average(predicts, confidence_score, logit)
+            #logit = compute_average(predicts[batch_idx], conf_sco, logit_nms)
+
+            # get all the boxes coordinates
+            all_boxes = get_region_boxes(logit_nms, cfg.NUM_CLASSES)
+            for k in range(num_gts):
+                box_gt = [truth[k][1], truth[k][2], truth[k][3], truth[k][4], truth[k][5], 
+                        truth[k][6], truth[k][7], truth[k][8], truth[k][9], truth[k][10],
+                        truth[k][11], truth[k][12], truth[k][13], truth[k][14], truth[k][15],
+                        truth[k][16], truth[k][17], truth[k][18], 1.0, 1.0, truth[k][0]]
+                best_conf_est = -1
+                
+                #If the prediction has the highest confidence, choose it as prediction
+                for j in range(len(all_boxes)):
+                    if all_boxes[j][18] > best_conf_est:
+                        best_conf_est = all_boxes[j][18]
+                        box_pr = all_boxes[j]
+                        match = corner_confidence9(box_gt[:18], all_boxes[j][:18])
+
+                #denomalize the corner prediction
+                corners2D_gt = np.array(np.reshape(box_gt[:18], [9, 2]), dtype='float32')
+                corners2D_pr = np.array(np.reshape(box_pr[:18], [9, 2]), dtype='float32')
+                corners2D_gt[:, 0] = corners2D_gt[:, 0] * im_width
+                corners2D_gt[:, 1] = corners2D_gt[:, 1] * im_height
+                corners2D_pr[:, 0] = corners2D_pr[:, 0] * im_width
+                corners2D_pr[:, 1] = corners2D_pr[:, 1] * im_height
+
+                # Compute corner prediction error
+                corner_norm = np.linalg.norm(corners2D_gt - corners2D_pr, axis=1)
+                corner_dist = np.mean(corner_norm)
+                errs_corner2D.append(corner_dist)
+
+                # Compute [R|t] by pnp
+                R_gt, t_gt = pnp(np.array(np.transpose(np.concatenate((np.zeros((3, 1)), self.corners3D[:3, :]), axis=1)), dtype='float32'),
+                                corners2D_gt, np.array(self.internal_calibration, dtype='float32'))
+                R_pr, t_pr = pnp(np.array(np.transpose(np.concatenate((np.zeros((3, 1)), self.corners3D[:3, :]), axis=1)), dtype='float32'),
+                                corners2D_pr, np.array(self.internal_calibration, dtype='float32'))
+
+                # Compute errors
+
+                # Compute translation error
+                trans_dist   = np.sqrt(np.sum(np.square(t_gt - t_pr)))
+                errs_trans.append(trans_dist)
+
+                # Compute angle error
+                angle_dist   = calcAngularDistance(R_gt, R_pr)
+                errs_angle.append(angle_dist)
+
+                # Compute pixel error
+                Rt_gt        = np.concatenate((R_gt, t_gt), axis=1)
+                Rt_pr        = np.concatenate((R_pr, t_pr), axis=1)
+                proj_2d_gt   = compute_projection(self.vertices, Rt_gt, self.internal_calibration) 
+                proj_2d_pred = compute_projection(self.vertices, Rt_pr, self.internal_calibration) 
+                norm         = np.linalg.norm(proj_2d_gt - proj_2d_pred, axis=0)
+                pixel_dist   = np.mean(norm)
+                errs_2d.append(pixel_dist)
+
+                # Compute 3D distances
+                transform_3d_gt   = compute_transformation(self.vertices, Rt_gt) 
+                transform_3d_pred = compute_transformation(self.vertices, Rt_pr)  
+                norm3d            = np.linalg.norm(transform_3d_gt - transform_3d_pred, axis=0)
+                vertex_dist       = np.mean(norm3d)    
+                errs_3d.append(vertex_dist)  
+
+                # Sum errors
+                testing_error_trans  += trans_dist
+                testing_error_angle  += angle_dist
+                testing_error_pixel  += pixel_dist
+                testing_samples      += 1
+        # Compute 2D projection, 6D pose and 5cm5degree scores
+        px_threshold = 5
+        acc = len(np.where(np.array(errs_2d) <= px_threshold)[0]) * 100. / (len(errs_2d)+eps)
+        acc3d = len(np.where(np.array(errs_3d) <= self.vx_threshold)[0]) * 100. / (len(errs_3d)+eps)
+        acc5cm5deg = len(np.where((np.array(errs_trans) <= 0.05) & (np.array(errs_angle) <= 5))[0]) * 100. / (len(errs_trans)+eps)
+        corner_acc = len(np.where(np.array(errs_corner2D) <= px_threshold)[0]) * 100. / (len(errs_corner2D)+eps)
+        mean_err_2d = np.mean(errs_2d)
+        mean_corner_err_2d = np.mean(errs_corner2D)
+        nts = float(testing_samples)
+        # Print test statistics
+        print("   Mean corner error is %f" % (mean_corner_err_2d))
+        print('   Acc using {} px 2D Projection = {:.2f}%'.format(px_threshold, acc))
+        print('   Acc using {} vx 3D Transformation = {:.2f}%'.format(self.vx_threshold, acc3d))
+        print('   Acc using 5 cm 5 degree metric = {:.2f}%'.format(acc5cm5deg))
+        print('   Translation error: %f, angle error: %f' % (testing_error_trans/(nts+eps), testing_error_angle/(nts+eps)) )
+
+        # Register losses and errors for saving later on
+        self.testing_errors_trans.append(testing_error_trans/(nts+eps))
+        self.testing_errors_angle.append(testing_error_angle/(nts+eps))
+        self.testing_errors_pixel.append(testing_error_pixel/(nts+eps))
+        self.testing_accuracies.append(acc)
+
+    
 
 
     def save_config(self):
@@ -237,10 +347,10 @@ def main():
     yolo = YOLO6D_net()
 
     #datasets = ImageNet(pre=args.pre)
-    datasets = Pascal_voc(pre=args.pre)
-    #datasets = None
-
-    solver = Solver(yolo, datasets, args.datacfg)
+    #datasets = Pascal_voc(pre=args.pre)
+    datasets = None
+    solver = Solver(yolo, datasets)
+    #solver = Solver(yolo, datasets, arg=args.datacfg)
     print("------start training------")
     #solver.train()
     print("-------training end-------")

@@ -20,6 +20,40 @@ def sigmoid_func(x, derivative=False):
     """
     return x*(1-x) if derivative else 1/(1+np.exp(-x))
 
+def softmax(X, theta = 1.0, axis = None):
+    """
+    Compute the softmax of each element along an axis of X.
+
+    Parameters
+    ----------
+    X: ND-Array. Probably should be floats. 
+    theta (optional): float parameter, used as a multiplier
+        prior to exponentiation. Default = 1.0
+    axis (optional): axis to compute values along. Default is the 
+        first non-singleton axis.
+
+    Returns an array the same size as X. The result will sum to 1
+    along the specified axis.
+    """
+    # make X at least 2d
+    y = np.atleast_2d(X)
+    # find axis
+    if axis is None:
+        axis = next(j[0] for j in enumerate(y.shape) if j[1] > 1)
+    # multiply y against the theta parameter, 
+    y = y * float(theta)
+    # subtract the max for numerical stability
+    y = y - np.expand_dims(np.max(y, axis = axis), axis)
+    # exponentiate y
+    y = np.exp(y)
+    # take the sum along the specified axis
+    ax_sum = np.expand_dims(np.sum(y, axis = axis), axis)
+    # finally: divide elementwise
+    p = y / ax_sum
+    # flatten if X was 1D
+    if len(X.shape) == 1: p = p.flatten()
+    return p
+
 def confidence_func(x):
     """
     Args:
@@ -127,11 +161,12 @@ def nms(input_tensor, cscs):
         output: a numpy feature tensor with shape: [cell_size, cell_size, 18]
     """
     res = np.zeros_like(cscs, dtype=np.float32)
-    for i in range(1, input_tensor.shape[0]-1, 1):
-        for j in range(1, input_tensor.shape[1]-1, 1):
+    for i in range(1, input_tensor.shape[0]-1, 2):
+        for j in range(1, input_tensor.shape[1]-1, 2):
             temp = cscs[i-1:i+2, j-1:j+2, :]
             temp_max = np.argmax(temp)
-            k, l, __ = np.where(temp == temp_max)
+            k, l, __ = np.where(temp == temp_max)  # k, l, __ is a tuple
+            k, l = k[0], l[0]
             res[k+i-1, l+j-1, :] = 1
     res = np.tile(res, [1, 1, input_tensor.shape[2]])
     out_tensor = np.multiply(res, input_tensor)
@@ -142,6 +177,104 @@ def compute_average(orig_tensor, cscs, out_tensor):
     Unfinish
     """
     return out_tensor
+
+def get_region_boxes(output, num_classes):
+    """
+    Return a list which elements are coordinates of all boxes
+    Args:
+        output: 3-D tensor with shape [cell, cell, 19+num_classes]
+        num_classes:
+    Return:
+        A list
+    """
+    anchor_num = 1
+    
+    output_coord = output[:, :, :18]
+    output_cls   = output[:, :, 18:-1]
+    output_confs = output[:, :, -1]
+    h, w, d = output.shape[0], output.shape[1], output_coord.shape[2]
+    off_set = np.transpose(np.reshape(np.array([np.arange(h)] * w * d * anchor_num), (d, h, w)), (1, 2, 0))
+    off_set[output == 0] = 0
+
+    output_coord = np.concatenate([sigmoid_func(output_coord[:, :, :2]) + off_set[:, :, :2],
+                            output_coord[:, :, 2:] + off_set[:, :, 2:]], 2)
+    output_confs = sigmoid_func(output_confs)
+    output_cls = softmax(output_cls)
+
+    boxes = []
+    for i in h:
+        for j in w:
+            max_conf = -1
+            if output_confs[i][j][0] == 0:
+                continue
+            else:
+                xc = output_coord[i][j][0]
+                yc = output_coord[i][j][1]
+                x1 = output_coord[i][j][2]
+                y1 = output_coord[i][j][3]
+                x2 = output_coord[i][j][4]
+                y2 = output_coord[i][j][5]
+                x3 = output_coord[i][j][6]
+                y3 = output_coord[i][j][7]
+                x4 = output_coord[i][j][8]
+                y4 = output_coord[i][j][9]
+                x5 = output_coord[i][j][10]
+                y5 = output_coord[i][j][11]
+                x6 = output_coord[i][j][12]
+                y6 = output_coord[i][j][13]
+                x7 = output_coord[i][j][14]
+                y7 = output_coord[i][j][15]
+                x8 = output_coord[i][j][16]
+                y8 = output_coord[i][j][17]
+                output_conf = output_confs[i][j][0]
+                if max_conf < output_conf:
+                    max_conf = output_conf
+                    max_idi, max_idj = i, j
+                cls_max_conf = np.max(output_cls[i][j])
+                cls_max_id, = np.where(output_cls[i][j] == cls_max_conf)
+                cls_max_id = cls_max_id[0]
+            box = [xc/h, yc/w, x1/h, y1/w, x2/h, y2/w, x3/h, y3/w, x4/h, y4/w, x5/h, y5/w, x6/h, y6/w, x7/h, y7/w, x8/h, y8/w, 
+                    output_conf, cls_max_conf, cls_max_id]
+            boxes.append(box)
+
+    return boxes
+
+def corner_confidence9(gt_corners, pr_corners, th=80, sharpness=2, im_width=640, im_height=480):
+    ''' gt_corners: Ground-truth 2D projections of the 3D bounding box corners, shape: (18,) type: list
+        pr_corners: Prediction for the 2D projections of the 3D bounding box corners, shape: (18,), type: list
+        th        : distance threshold, type: int
+        sharpness : sharpness of the exponential that assigns a confidence value to the distance
+        -----------
+        return    : a list of shape (9,) with 9 confidence values 
+    '''
+    dist = gt_corners - pr_corners
+    dist = dist.reshape(9, 2)
+    dist[:, 0] = dist[:, 0] * im_width
+    dist[:, 1] = dist[:, 1] * im_height
+    eps = 1e-5
+    dist  = np.sqrt(np.sum((dist)**2, axis=1))
+    mask  = (dist < th)
+    conf  = np.exp(sharpness * (1.0 - dist/th)) - 1
+    conf0 = np.exp(np.array([sharpness])) - 1 + eps
+    conf  = conf / conf0.repeat(18).reshape(9,1)
+    # conf = 1.0 - dist/th
+    conf  = mask * conf 
+    return np.mean(conf)
+
+def calcAngularDistance(gt_rot, pr_rot):
+    rotDiff = np.dot(gt_rot, np.transpose(pr_rot))
+    trace = np.trace(rotDiff) 
+    return np.rad2deg(np.arccos((trace-1.0)/2.0))
+
+def compute_transformation(points_3D, transformation):
+    return transformation.dot(points_3D)
+
+def compute_projection(points_3D, transformation, internal_calibration):
+    projections_2d = np.zeros((2, points_3D.shape[1]), dtype='float32')
+    camera_projection = (internal_calibration.dot(transformation)).dot(points_3D)
+    projections_2d[0, :] = camera_projection[0, :]/camera_projection[2, :]
+    projections_2d[1, :] = camera_projection[1, :]/camera_projection[2, :]
+    return projections_2d
 
 def pnp(points_3D, points_2D, cameraMatrix):
     """
@@ -221,8 +354,8 @@ def read_data_cfg(datacfg):
     return options
 
 def makedirs(path):
-    if not os.path.exists( path ):
-        os.makedirs( path )
+    if not os.path.exists(path):
+        os.makedirs(path)
 
 def get_3D_corners(vertices):
     

@@ -119,7 +119,7 @@ class YOLO6D_net:
 
         x = self.conv(x, 3, 1, 1024, 'leaky', name='26_conv')
         self.Batch_Norm = False
-        x = self.conv(x, 1, 1, 18 + 1 + self.num_class, 'linear', name='37_conv') ## 9 points 1 confidence C classes
+        x = self.conv(x, 1, 1, 18 + 1 + self.num_class, 'linear', name='27_conv') ## 9 points 1 confidence C classes
 
         if self.disp:
             print("----building network complete----")
@@ -142,7 +142,7 @@ class YOLO6D_net:
         weight_shape = [kernel_size, kernel_size, x_channels, filters]
         bias_shape = [filters]
         strides = [stride, stride, stride, stride]
-        weight = tf.Variable(tf.truncated_normal(weight_shape, stddev=0.1), name='weight')
+        weight = tf.Variable(tf.truncated_normal(weight_shape, stddev=0.1), name='weights')
         bias = tf.Variable(tf.constant(0.1, shape=bias_shape), name='biases')
         #weight = self._get_variable("weight", weight_shape, initializer=tf.truncated_normal_initializer(stddev=0.1))
         #bias = self._get_variable("bias", bias_shape, initializer=tf.constant_initializer(0.0))
