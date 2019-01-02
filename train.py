@@ -70,12 +70,9 @@ class Solver(object):
         if self.saveconfig:
             self.save_config()
 
-        #self.scope = tf.get_variable_scope().original_name_scope
         #self.options = tf.get_default_graph().get_operations()
         self.variable_to_restore = tf.global_variables()
-        #last_tensor = tf.get_default_graph().get_tensor_by_name("27_conv:0")
-        #self.variable_to_restore.remove(last_tensor)
-        #print(tf.all_variables())
+        self.variable_to_restore = self.variable_to_restore[:-2]  # remove last 2 tensor
         self.restorer = tf.train.Saver(self.variable_to_restore, max_to_keep=3)
         self.saver = tf.train.Saver(self.variable_to_restore, max_to_keep=3)
 
