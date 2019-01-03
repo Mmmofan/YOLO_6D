@@ -20,7 +20,7 @@ import tensorflow as tf
 import yolo.config as cfg
 from Imagenet import ImageNet
 from pascal_voc import Pascal_voc
-#import dataset
+from linemod import Linemod
 from utils.MeshPly import MeshPly
 from utils.timer import Timer
 from utils.utils import *
@@ -32,15 +32,9 @@ class Solver(object):
     def __init__(self, net, data, arg=None):
 
         #Set parameters for training and testing
-        self.data_options = read_data_cfg(arg)
-        self.trainlist = self.data_options['train']
-        self.testlist = self.data_options['test']
-        self.gpus = self.data_options['gpu']
-        self.meshname = self.data_options['mesh']
-        self.num_workers = int(self.data_options['num_workers'])
-        self.backupdir = self.data_options['backup']
-        self.diam = float(self.data_options['diam'])
-        self.vx_threshold = self.diam * 0.1
+        self.meshname = data.meshname
+        self.backupdir = data.backupdir
+        self.vx_threshold = data.vx_threshold
 
         self.mesh = MeshPly(self.meshname)
         self.vertices = np.c_[np.array(self.mesh.vertices), np.ones((len(self.mesh.vertices), 1))].T
@@ -337,7 +331,7 @@ def update_config_paths(data_dir, weights_file):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--datacfg', default='cfg/ape.data', type=str)
+    parser.add_argument('--datacfg', default='cfg/', type=str)
     parser.add_argument('--weights', default="YOLO_6D.ckpt", type=str)
     parser.add_argument('--pre', default=False, type=bool)
     parser.add_argument('--data_dir', default="data", type=str)
@@ -353,9 +347,6 @@ def main():
         cfg.CONF_OBJ_SCALE = 0.0
         cfg.CONF_NOOBJ_SCALE = 0.0
 
-    if args.gpu is not None:
-        cfg.GPU = args.gpu
-
     if args.data_dir != cfg.DATA_DIR:
         update_config_paths(args.data_dir, args.weights)
         
@@ -365,10 +356,9 @@ def main():
 
     #datasets = ImageNet(pre=args.pre)
     #datasets = Pascal_voc(pre=args.pre)
-    datasets = None
+    datasets = Linemod('train', arg=args.datacfg)
 
-    solver = Solver(yolo, datasets)
-    #solver = Solver(yolo, datasets, arg=args.datacfg)
+    solver = Solver(yolo, datasets, arg=args.datacfg)
     print("------start training------")
     solver.train()
     print("-------training end-------")
