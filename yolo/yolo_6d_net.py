@@ -78,7 +78,7 @@ class YOLO6D_net:
 
     def _build_net(self, input):
         if self.disp:
-            print("--------building network--------")
+            print("--------building network---------")
         self.Batch_Norm = True
         x = self.conv(input, 3, 1, 32, 'leaky', name='0_conv')
         x = self.max_pool_layer(x, name='1_pool')
@@ -142,7 +142,7 @@ class YOLO6D_net:
         weight_shape = [kernel_size, kernel_size, x_channels, filters]
         bias_shape = [filters]
         strides = [stride, stride, stride, stride]
-        weight = tf.Variable(tf.truncated_normal(weight_shape, stddev=0.1), name='weights')
+        weight = tf.Variable(tf.truncated_normal(weight_shape, stddev=0.1), name='weight')
         bias = tf.Variable(tf.constant(0.1, shape=bias_shape), name='biases')
         #weight = self._get_variable("weight", weight_shape, initializer=tf.truncated_normal_initializer(stddev=0.1))
         #bias = self._get_variable("bias", bias_shape, initializer=tf.constant_initializer(0.0))
@@ -247,7 +247,7 @@ class YOLO6D_net:
             tf.losses.add_loss(conf_loss)
             tf.losses.add_loss(class_loss)
 
-    def confidence_score(self, predicts, confidence, scope='confidence_score'):
+    def confidence_score(self, predicts, confidence):
         """
         compute the class-specific confidence scores
         see paper section 3.3
@@ -259,6 +259,7 @@ class YOLO6D_net:
 
         class_speci_conf_score = tf.multiply(predict_classes, confidence)
         class_speci_conf_score = tf.reduce_mean(class_speci_conf_score, axis=3, keep_dims=True)
+        class_speci_conf_score = tf.nn.sigmoid(class_speci_conf_score)
 
         return class_speci_conf_score
 

@@ -166,7 +166,7 @@ def nms(input_tensor, cscs):
             temp = cscs[i-1:i+2, j-1:j+2, :]
             temp_max = np.argmax(temp)
             k, l, __ = np.where(temp == temp_max)  # k, l, __ is a tuple
-            k, l = k[0], l[0]
+            #k, l = k[0], l[0]
             res[k+i-1, l+j-1, :] = 1
     res = np.tile(res, [1, 1, input_tensor.shape[2]])
     out_tensor = np.multiply(res, input_tensor)
@@ -192,20 +192,21 @@ def get_region_boxes(output, num_classes):
     output_coord = output[:, :, :18]
     output_cls   = output[:, :, 18:-1]
     output_confs = output[:, :, -1]
-    h, w, d = output.shape[0], output.shape[1], output_coord.shape[2]
-    off_set = np.transpose(np.reshape(np.array([np.arange(h)] * w * d * anchor_num), (d, h, w)), (1, 2, 0))
-    off_set[output == 0] = 0
+    h, w, d = output.shape[0], output.shape[1], output.shape[2]
+    off_set = np.transpose(np.reshape(np.array([np.arange(h)] * w * 18 * anchor_num), (18, h, w)), (1, 2, 0))
+    off_set[output_confs == 0] = 0
+    off_set_centroids = off_set[:, :, :2]
+    off_set_corners = off_set[:, :, 2:]
 
-    output_coord = np.concatenate([sigmoid_func(output_coord[:, :, :2]) + off_set[:, :, :2],
-                            output_coord[:, :, 2:] + off_set[:, :, 2:]], 2)
+    output_coord = np.concatenate([(sigmoid_func(output_coord[:, :, :2]) + off_set_centroids), (output_coord[:, :, 2:] + off_set_corners)], 2)
     output_confs = sigmoid_func(output_confs)
     output_cls = softmax(output_cls)
 
     boxes = []
-    for i in h:
-        for j in w:
+    for i in range(h):
+        for j in range(w):
             max_conf = -1
-            if output_confs[i][j][0] == 0:
+            if output_confs[i][j] == 0:
                 continue
             else:
                 xc = output_coord[i][j][0]
@@ -226,7 +227,7 @@ def get_region_boxes(output, num_classes):
                 y7 = output_coord[i][j][15]
                 x8 = output_coord[i][j][16]
                 y8 = output_coord[i][j][17]
-                output_conf = output_confs[i][j][0]
+                output_conf = output_confs[i][j]
                 if max_conf < output_conf:
                     max_conf = output_conf
                     max_idi, max_idj = i, j
@@ -247,10 +248,11 @@ def corner_confidence9(gt_corners, pr_corners, th=80, sharpness=2, im_width=640,
         -----------
         return    : a list of shape (9,) with 9 confidence values 
     '''
-    dist = gt_corners - pr_corners
+    dist = np.subtract(gt_corners, pr_corners)
     dist = dist.reshape(9, 2)
     dist[:, 0] = dist[:, 0] * im_width
     dist[:, 1] = dist[:, 1] * im_height
+    
     eps = 1e-5
     dist  = np.sqrt(np.sum((dist)**2, axis=1))
     mask  = (dist < th)

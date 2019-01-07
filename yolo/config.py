@@ -15,17 +15,16 @@ DISP = True
 
 ##Files parameters
 DATA_DIR = 'data'  
-DATASETS_DIR = os.path.join(DATA_DIR, 'datasets')
-CACHE_DIR = os.path.join(DATASETS_DIR, 'cache')
-OUTPUT_DIR = os.path.join(DATASETS_DIR, 'output')
-WEIGHTS_DIR = os.path.join(DATASETS_DIR, 'weights')
+CACHE_DIR = os.path.join(DATA_DIR, 'cache')
+OUTPUT_DIR = os.path.join(DATA_DIR, 'output')
+WEIGHTS_DIR = os.path.join(DATA_DIR, 'weights')
 WEIGHTS_FILE = os.path.join(WEIGHTS_DIR, 'yolo_6d.ckpt')
 
 FLIPPED = True
 
 ##Network parameters
-NUM_CLASSES = 16
-BATCH_SIZE = 32
+NUM_CLASSES = 13
+BATCH_SIZE = 4
 TEST_BATCH_SIZE =64
 WEIGHT_DECAY = 0.0005
 MAX_PAD = 'SAME'
@@ -48,14 +47,14 @@ CLASS_SCALE = 1.0
 COORD_SCALE = 1.0
 
 #Training parameters
-GPU = '1'
+GPU = '0'
 LEARNING_RATE = 0.001
 DECAY_STEP = 3200  ## batch_size * 100
 DECAY_RATE = 0.1
 STAIRCASE = True
 MAX_ITER = 15000
 SUMMARY_ITER = 10
-SAVE_ITER = 1000
+SAVE_ITER = 40
 
 #Test parameters
 CONF_THRESHOLD = 0.1
