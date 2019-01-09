@@ -52,7 +52,7 @@ class Solver(object):
         self.data = data
         self.batch_size = cfg.BATCH_SIZE
         self.weight_file = cfg.WEIGHTS_FILE
-        self.max_iter = cfg.MAX_ITER
+        self.max_iter = len(data.imgname)
         self.inital_learning_rate = cfg.LEARNING_RATE
         self.decay_steps = cfg.DECAY_STEP
         self.decay_rate = cfg.DECAY_RATE
@@ -103,7 +103,7 @@ class Solver(object):
         train_timer = Timer()
         load_timer = Timer()
 
-        for step in range(1, self.max_iter + 1):
+        for step in range(1, self.max_iter):
             load_timer.tic()
             images, labels = self.data.next_batches()
             load_timer.toc()

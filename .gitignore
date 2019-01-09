@@ -8,7 +8,9 @@ __pycache__/
 *.weights
 *.png
 *.ply
-
+0*.txt
+*.DS_Store
+*.xml
 
 # C extensions
 *.so
