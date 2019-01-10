@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 *.pyc[cod]
 
+*.pyc
 *.jpg
 *.weights
 *.png
@@ -11,6 +12,15 @@ __pycache__/
 0*.txt
 *.DS_Store
 *.xml
+*range.txt
+*train.txt
+*val.txt
+*test.txt
+*occlusion.txt
+*checkpoint*
+*.ckpt*
+
+
 
 # C extensions
 *.so

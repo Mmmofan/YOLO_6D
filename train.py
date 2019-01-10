@@ -166,9 +166,11 @@ class Solver(object):
             if step % self.save_iter == 0:
                 datetime.datetime.now().strftime('%m/%d %H:%M:%S')
                 print('   Save checkpoint file to: {}'.format(
-                    self.output_dir))
+                    self.weight_file))
                 self.saver.save(self.sess, self.weight_file, 
                                 global_step=self.global_step)
+        print('   Save final checkpoint file to: {}'.format(self.weight_file))
+        self.saver.save(self.sess, self.weight_file, global_step=self.global_step)
 
 
     def test(self):

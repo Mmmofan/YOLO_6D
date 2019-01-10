@@ -23,9 +23,7 @@ class Linemod(object):
         self.data_options = read_data_cfg(arg)
         self.trainlist = self.data_options['train']
         self.testlist = self.data_options['valid']
-        #self.gpus = self.data_options['gpu']
         self.meshname = self.data_options['mesh']
-        #self.num_workers = int(self.data_options['num_workers'])
         self.backupdir = self.data_options['backup']
         self.diam = float(self.data_options['diam'])
         self.dataset_name = self.data_options['name']
@@ -35,6 +33,9 @@ class Linemod(object):
         self.datasets_dir = os.path.join('LINEMOD', self.dataset_name)
         self.batch_size = cfg.BATCH_SIZE
         self.image_size = cfg.IMAGE_SIZE
+        self.image_width = 640   # axis x
+        self.image_height = 480   # axis y
+
         self.cell_size = cfg.CELL_SIZE
         self.boxes_per_cell = cfg.BOXES_PER_CELL
         self.num_classes = cfg.NUM_CLASSES
@@ -60,25 +61,27 @@ class Linemod(object):
                 self.imgname = [x.strip() for x in f.readlines()]
             self.gt_labels = self.load_labels()
         else:
-            print('Wrong phase...')
+            print('\n   Wrong phase...\n   Try again...')
 
     def next_batches(self):
-        if self.batch == 245:
-            print('   Last small batch of {}'.format(self.dataset_name))
         images = np.zeros((self.batch_size, 416, 416, 3), np.float32)
         labels = np.zeros((self.batch_size, 13, 13, 1 + self.boxes_per_cell*9*2 + self.num_classes), np.float32)
+
         for idx in range(self.batch_size):
-            images[idx] = self.image_read(self.imgname[idx + self.batch * self.batch_size])
-            labels[idx] = self.label_read(self.gt_labels[idx + self.batch * self.batch_size])
+            images[idx] = self.image_read(self.imgname[idx + self.batch * self.batch_size], self.flipped)
+            labels[idx] = self.label_read(self.gt_labels[idx + self.batch * self.batch_size], self.flipped)
+
         self.batch += 1
         return images, labels
 
     def next_batches_test(self):
         images = np.zeros((self.batch_size, 416, 416, 3), np.float32)
         labels = np.zeros((self.batch_size, 13, 13, 32), np.float32)
+
         for idx in range(self.batch_size):
             images[idx] = self.image_read(self.imgname[idx + self.batch * self.batch_size], self.flipped)
-            labels[idx] = self.label_read(self.gt_labels[idx + self.batch * self.batch_size])
+            labels[idx] = self.label_read(self.gt_labels[idx + self.batch * self.batch_size], self.flipped)
+
         return images, labels
 
     def get_truths(self):
@@ -89,7 +92,7 @@ class Linemod(object):
 
     def load_labels(self):
         """
-        Return: 2-D list, a list of all the list in folder
+        Return: 2-D list, a list of all the lists in folder
         """
         gt_labels = []
         label_path = os.path.join(self.datasets_dir, 'labels')
@@ -105,39 +108,57 @@ class Linemod(object):
             gt_labels.append(labels)
         return gt_labels
 
-    def image_read(self, imgname, flipped=False):
+    def image_read(self, imgname, flipped):
         image = cv2.imread(imgname)
         image = cv2.resize(image, (self.image_size, self.image_size))
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
-        image = (image / 255.0) * 2.0 - 1.0
+
+        #image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
+        #image = (image / 255.0) * 2.0 - 1.0
+        
         if flipped:
-            image = image[:, ::-1, :]
+            image = cv2.flip(image, 0)
+
         return image
 
-    def label_read(self, gt_labels):
+    def lael_read(self, gt_labels, flipped):
+        """
+        Args:
+            gt_labels: a ground true label contain coordinates and class
+            flipped: Whether the images are flipped
+        Return:
+            A 3-D tensor with shape [13, 13, 19 + num_classes]
+        """
         labels = np.zeros((13, 13, 1+self.boxes_per_cell*9*2 + self.num_classes), np.float32)
+
         gt_label = gt_labels[0]
-        gt_xc = gt_labels[1] * 13
-        gt_yc = gt_labels[2] * 13
-        gt_x0 = gt_labels[3] * 13
-        gt_y0 = gt_labels[4] * 13
-        gt_x1 = gt_labels[5] * 13
-        gt_y1 = gt_labels[6] * 13
-        gt_x2 = gt_labels[7] * 13
-        gt_y2 = gt_labels[8] * 13
-        gt_x3 = gt_labels[9] * 13
-        gt_y3 = gt_labels[10] * 13
-        gt_x4 = gt_labels[11] * 13
-        gt_y4 = gt_labels[12] * 13
-        gt_x5 = gt_labels[13] * 13
-        gt_y5 = gt_labels[14] * 13
-        gt_x6 = gt_labels[15] * 13
-        gt_y6 = gt_labels[16] * 13
-        gt_x7 = gt_labels[17] * 13
-        gt_y7 = gt_labels[18] * 13
-        coords = [gt_xc, gt_yc, gt_x0, gt_y0, gt_x1, gt_y1, gt_x2, gt_y2, gt_x3, gt_y3, gt_x4, gt_y4, gt_x5, gt_y5, gt_x6, gt_y6, gt_x7, gt_y7]
-        response_x = int(gt_xc)
-        response_y = int(gt_yc)
+        gt_xc = gt_labels[1]  * 416
+        gt_yc = gt_labels[2]  * 416
+        gt_x0 = gt_labels[3]  * 416
+        gt_y0 = gt_labels[4]  * 416
+        gt_x1 = gt_labels[5]  * 416
+        gt_y1 = gt_labels[6]  * 416
+        gt_x2 = gt_labels[7]  * 416
+        gt_y2 = gt_labels[8]  * 416
+        gt_x3 = gt_labels[9]  * 416
+        gt_y3 = gt_labels[10] * 416
+        gt_x4 = gt_labels[11] * 416
+        gt_y4 = gt_labels[12] * 416
+        gt_x5 = gt_labels[13] * 416
+        gt_y5 = gt_labels[14] * 416
+        gt_x6 = gt_labels[15] * 416
+        gt_y6 = gt_labels[16] * 416
+        gt_x7 = gt_labels[17] * 416
+        gt_y7 = gt_labels[18] * 416
+
+        if not flipped:
+            coords = [gt_xc, gt_yc, gt_x0, gt_y0, gt_x1, gt_y1, gt_x2, gt_y2, gt_x3, gt_y3, 
+                      gt_x4, gt_y4, gt_x5, gt_y5, gt_x6, gt_y6, gt_x7, gt_y7]
+        else:
+            coords = [gt_xc, 416-gt_yc, gt_x7, 416-gt_y7, gt_x6, 416-gt_y6, gt_x5, 416-gt_y5, gt_x4, 416-gt_y4, 
+                      gt_x3, 416-gt_y3, gt_x2, 416-gt_y2, gt_x1, 416-gt_y1, gt_x0, 416-gt_y0]
+
+        response_x = int(gt_xc / 416 * 13)
+        response_y = int(gt_yc / 416 * 13)
         labels[response_x, response_y, 0] = 1
 
         for i in range(1, 19, 1):

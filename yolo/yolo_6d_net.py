@@ -66,9 +66,9 @@ class YOLO6D_net:
         self.input_images = tf.placeholder(tf.float32, [None, self.image_size, self.image_size, 3], name='Input')
         self.logit = self._build_net(self.input_images)
         self.labels = tf.placeholder(tf.float32, [None, self.cell_size, self.cell_size, 18 + 1 + self.num_class], name='Labels')
-        self.confidence = tf.reshape(self.logit[:, :, :, -1], [self.Batch_Size, self.cell_size, self.cell_size, 1] )
+        self.confidence = tf.reshape(self.logit[:, :, :, -1], [-1, self.cell_size, self.cell_size, 1] )
         self.conf_value = self.confidence
-        self.conf_value = tf.reshape(self.logit[:, :, :, -1], [self.Batch_Size, self.cell_size, self.cell_size, 1])
+        self.conf_value = tf.reshape(self.logit[:, :, :, -1], [-1, self.cell_size, self.cell_size, 1])
         self.conf_score = self.confidence_score(self.logit, self.conf_value)
 
         if is_training:
