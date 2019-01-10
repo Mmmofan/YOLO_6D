@@ -48,7 +48,7 @@ COORD_SCALE = 1.0
 
 #Training parameters
 GPU = '0'
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.0001
 DECAY_STEP = 3200  ## batch_size * 100
 DECAY_RATE = 0.1
 STAIRCASE = True

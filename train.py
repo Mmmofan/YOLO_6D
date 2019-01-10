@@ -366,7 +366,7 @@ def main():
     print("-----------------------------start training----------------------------")
     solver.train()
     print("------------------------------training end-----------------------------")
-    shutil.copy2('%s/model.weights' % (solver.backupdir), '%s/model_backup.weights' % (solver.backupdir))
+    #shutil.copy2('%s/model.weights' % (solver.backupdir), '%s/model_backup.weights' % (solver.backupdir))
 
 if __name__ == "__main__":
     

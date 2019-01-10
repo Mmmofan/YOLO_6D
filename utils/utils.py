@@ -57,7 +57,7 @@ def softmax(X, theta = 1.0, axis = None):
 def confidence_func(x):
     """
     Args:
-        A 4-D tensor: [Batch_size, feature_size, feature_size, 18]
+        x: A 4-D tensor: [Batch_size, feature_size, feature_size, 18]
         compute confidence score then concat to original
     Returns:
         A 4-D tensor: [Batch_Size, feature_size, feature_size, 18]
@@ -65,7 +65,12 @@ def confidence_func(x):
     alpha = tf.constant(cfg.ALPHA, dtype=tf.float32)
     dth_in_cell_size = tf.constant(cfg.Dth / cfg.CELL_SIZE, dtype=tf.float32)
     param1 = tf.ones_like(x, dtype=tf.float32)
-    confidence = (tf.exp(alpha * (param1 - x / dth_in_cell_size))) / (tf.exp(alpha) - param1)
+
+    temp = tf.cast(x <= dth_in_cell_size, tf.float32)
+    confidence = (tf.exp(alpha * (param1 - x / dth_in_cell_size)) - param1) / (tf.exp(alpha) - param1)
+    confidence = tf.multiply(confidence, temp)  
+    # if distance in x bigger than threshold, value calculated will be negtive, use above to make the negtive to 0
+
     confidence = tf.reduce_mean(confidence, 3, keep_dims=True)
     return confidence
 

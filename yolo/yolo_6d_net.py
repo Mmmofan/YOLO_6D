@@ -40,7 +40,7 @@ class YOLO6D_net:
     Batch_Norm = cfg.BATCH_NORM
     ALPHA = cfg.ALPHA
     cell_size = cfg.CELL_SIZE
-    num_coord = cfg.NUM_COORD  ## 9 points, 8 corners + 1 centroid
+    num_coord = cfg.NUM_COORD  ## 18: 9 points, 8 corners + 1 centroid
 
     obj_scale = cfg.CONF_OBJ_SCALE
     noobj_scale = cfg.CONF_NOOBJ_SCALE
@@ -64,21 +64,23 @@ class YOLO6D_net:
                                     (1, 2, 0))
 
         self.input_images = tf.placeholder(tf.float32, [None, self.image_size, self.image_size, 3], name='Input')
-        self.logit = self._build_net(self.input_images)
         self.labels = tf.placeholder(tf.float32, [None, self.cell_size, self.cell_size, 18 + 1 + self.num_class], name='Labels')
-        self.confidence = tf.reshape(self.logit[:, :, :, -1], [-1, self.cell_size, self.cell_size, 1] )
-        self.conf_value = self.confidence
-        self.conf_value = tf.reshape(self.logit[:, :, :, -1], [-1, self.cell_size, self.cell_size, 1])
-        self.conf_score = self.confidence_score(self.logit, self.conf_value)
+
+        self.logit = self._build_net(self.input_images)
+        self.confidence = None
 
         if is_training:
             self.loss_layer(self.logit, self.labels)
             self.total_loss = tf.losses.get_total_loss()
             tf.summary.scalar('Total loss', self.total_loss)
 
+        #self.conf_value = tf.reshape(self.logit[:, :, :, -1], [-1, self.cell_size, self.cell_size, 1])
+        self.conf_score = self.confidence_score(self.logit, self.confidence)
+
+
     def _build_net(self, input):
         if self.disp:
-            print("--------building network---------")
+            print("--------Building network---------")
         self.Batch_Norm = True
         x = self.conv(input, 3, 1, 32, 'leaky', name='0_conv')
         x = self.max_pool_layer(x, name='1_pool')
@@ -122,7 +124,7 @@ class YOLO6D_net:
         x = self.conv(x, 1, 1, 18 + 1 + self.num_class, 'linear', name='27_conv') ## 9 points 1 confidence C classes
 
         if self.disp:
-            print("----building network complete----")
+            print("----Building network complete----")
 
         return x
 
@@ -206,31 +208,37 @@ class YOLO6D_net:
                             last dimension: response(1) ==> coord(18) ==> classes(num_class) ==> confidence(1)
         """
         with tf.variable_scope(scope):
+            ## Predicts
             predict_coord = tf.reshape(predicts[:, :, :, :self.boundry_1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_coord])
             predict_classes = tf.reshape(predicts[:, :, :, self.boundry_1:-1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_class])
             predict_conf = tf.reshape(predicts[:, :, :, -1], [self.Batch_Size, self.cell_size, self.cell_size, 1])
 
+            predict_centroids = predict_coord[:, :, :, :2*self.boxes_per_cell]
+            predict_corners = predict_coord[:, :, :, 2*self.boxes_per_cell:]
+
+            ## Ground Truth
             response = tf.reshape(labels[:, :, :, 0], [self.Batch_Size, self.cell_size, self.cell_size, 1])
+            #response_for_coords = tf.tile(response, [1, 1, 1, self.num_coord * self.boxes_per_cell])  # shape: [batch, cell, cell, 18]
             labels_coord = tf.reshape(labels[:, :, :, 1:self.boundry_1+1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_coord])
             labels_classes = tf.reshape(labels[:, :, :, self.boundry_1+1:], [self.Batch_Size, self.cell_size, self.cell_size, self.num_class])
-            #labels_conf = tf.reshape(labels[:, :, :, -1], [self.Batch_Size, self.cell_size, self.cell_size, 1])
 
-            off_set = tf.constant(self.off_set, dtype=tf.float32)
-            off_set = tf.reshape(off_set, [1, self.cell_size, self.cell_size, 18 * self.boxes_per_cell])
-            off_set = tf.tile(off_set, [self.Batch_Size, 1, 1, 1])   
-            ## off_set shape : [self.Batch_Size, self.cell_size, self.cell_size, 18 * self.boxes_per_cell]
-            off_set_centroids = off_set[:, :, :, :2*self.boxes_per_cell]
-            off_set_corners = off_set[:, :, :, 2*self.boxes_per_cell:]
+            ## Offset
+            #off_set = tf.constant(self.off_set, dtype=tf.float32)
+            #off_set = tf.reshape(off_set, [1, self.cell_size, self.cell_size, 18 * self.boxes_per_cell])
+            #off_set = tf.tile(off_set, [self.Batch_Size, 1, 1, 1])  ## off_set shape : [Batch_Size, cell_size, cell_size, 18 * boxes_per_cell]
+            #off_set = tf.multiply(off_set, response_for_coords)
 
-            predict_boxes_tran = tf.concat([tf.add(tf.nn.sigmoid(predict_coord[:, :, :, :2]), off_set_centroids),
-                                        tf.add(predict_coord[:, :, :, 2:], off_set_corners)], 3) 
+            #off_set_centroids = off_set[:, :, :, :2*self.boxes_per_cell]
+            #off_set_corners = off_set[:, :, :, 2*self.boxes_per_cell:]
+
+            predict_boxes_tran = tf.concat([tf.nn.sigmoid(predict_centroids), predict_corners], 3)
             ## predicts coordinates with respect to input images, [Batch_Size, cell_size, cell_size, 18]
             ## output is offset with respect to centroid, so has to add the centroid coord(top-left corners of every cell)
             ## see paper section3.2
 
             ## Calculate confidence (instead of IoU like in YOLOv2)
-            dt_x = dist(predict_boxes_tran, labels_coord)
-            self.confidence = confidence_func(dt_x)
+            Euclid_dist = dist(predict_boxes_tran, labels_coord)
+            self.confidence = confidence_func(Euclid_dist)
 
             object_coef = tf.constant(self.obj_scale, dtype=tf.float32)
             noobject_coef = tf.constant(self.noobj_scale, dtype=tf.float32)
@@ -259,7 +267,7 @@ class YOLO6D_net:
 
         class_speci_conf_score = tf.multiply(predict_classes, confidence)
         class_speci_conf_score = tf.reduce_mean(class_speci_conf_score, axis=3, keep_dims=True)
-        class_speci_conf_score = tf.nn.sigmoid(class_speci_conf_score)
+        #class_speci_conf_score = tf.nn.sigmoid(class_speci_conf_score)
 
         return class_speci_conf_score
 
