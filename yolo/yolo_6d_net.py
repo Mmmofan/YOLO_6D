@@ -218,7 +218,6 @@ class YOLO6D_net:
 
             ## Ground Truth
             response = tf.reshape(labels[:, :, :, 0], [self.Batch_Size, self.cell_size, self.cell_size, 1])
-            #response_for_coords = tf.tile(response, [1, 1, 1, self.num_coord * self.boxes_per_cell])  # shape: [batch, cell, cell, 18]
             labels_coord = tf.reshape(labels[:, :, :, 1:self.boundry_1+1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_coord])
             labels_classes = tf.reshape(labels[:, :, :, self.boundry_1+1:], [self.Batch_Size, self.cell_size, self.cell_size, self.num_class])
 

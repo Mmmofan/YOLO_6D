@@ -52,7 +52,7 @@ class Solver(object):
         self.data = data
         self.batch_size = cfg.BATCH_SIZE
         self.weight_file = cfg.WEIGHTS_FILE
-        self.max_iter = len(data.imgname)
+        self.max_iter = int(len(data.imgname) / self.batch_size)
         self.inital_learning_rate = cfg.LEARNING_RATE
         self.decay_steps = cfg.DECAY_STEP
         self.decay_rate = cfg.DECAY_RATE
@@ -169,7 +169,8 @@ class Solver(object):
                     self.weight_file))
                 self.saver.save(self.sess, self.weight_file, 
                                 global_step=self.global_step)
-        print('   Save final checkpoint file to: {}'.format(self.weight_file))
+
+        print('\n   Save final checkpoint file to: {}'.format(self.weight_file))
         self.saver.save(self.sess, self.weight_file, global_step=self.global_step)
 
 
@@ -189,8 +190,6 @@ class Solver(object):
 
         feed_dict = {self.net.input_images: images, self.net.labels: labels}
         logit, confidence_score = self.sess.run([self.net.logit, self.net.conf_score], feed_dict=feed_dict)  # run
-        #confidence_score = self.net.conf_score
-        #confidence_score = confidence_score.eval()  ## confidence_score tensor, convert to Numpy array
         predicts = logit  ## Get predict tensor, convert to Numpy array
 
         testing_error_trans = 0.0
