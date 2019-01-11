@@ -63,7 +63,7 @@ def confidence_func(x):
         A 4-D tensor: [Batch_Size, feature_size, feature_size, 18]
     """
     alpha = tf.constant(cfg.ALPHA, dtype=tf.float32)
-    dth_in_cell_size = tf.constant(cfg.Dth / cfg.CELL_SIZE, dtype=tf.float32)
+    dth_in_cell_size = tf.constant(cfg.Dth * cfg.CELL_SIZE / 416, dtype=tf.float32)
     param1 = tf.ones_like(x, dtype=tf.float32)
 
     temp = tf.cast(x <= dth_in_cell_size, tf.float32)
@@ -158,6 +158,24 @@ def confidence_thresh(cscs, predicts, threshold=cfg.CONF_THRESHOLD):
 
 def nms(input_tensor, cscs):
     """
+    get the maximum confidence value to response
+    Args:
+        input_tensor: output_tensor from confidence_thresh with shape: [cell_size, cell_size, 18]
+        cscs: class-specific confidence score with shape: [cell_size, cell_size, 1]
+    Return:
+        a numpy feature tensor with shape: [cell_size, cell_size, 18]
+    """
+    res = np.zeros_like(cscs, dtype=np.float32)
+    max_idx = np.argmax(cscs)
+    col, row = divmod(max_idx, 13)
+    row -= 1
+    res[col, row, :] = 1
+    res = np.tile(res, [1, 1, input_tensor.shape[2]])
+    output = np.multiply(res, input_tensor)
+    return output
+
+def nms33(input_tensor, cscs):
+    """
     get the maximum confidence score tensor from confidence_thresh
     Args:
         cscs: class-specific confidence score with shape: [cell_size, cell_size, 1]
@@ -170,7 +188,7 @@ def nms(input_tensor, cscs):
         for j in range(1, input_tensor.shape[1]-1, 2):
             temp = cscs[i-1:i+2, j-1:j+2, :]
             temp_max = np.argmax(temp)
-            k, l, __ = np.where(temp == temp_max)  # k, l, __ is a tuple
+            k, l, __ = np.where(temp == temp_max) 
             #k, l = k[0], l[0]
             res[k+i-1, l+j-1, :] = 1
     res = np.tile(res, [1, 1, input_tensor.shape[2]])
@@ -194,17 +212,12 @@ def get_region_boxes(output, num_classes):
     """
     anchor_num = 1
     
+    h, w, d = output.shape[0], output.shape[1], output.shape[2]
     output_coord = output[:, :, :18]
     output_cls   = output[:, :, 18:-1]
-    output_confs = output[:, :, -1]
-    h, w, d = output.shape[0], output.shape[1], output.shape[2]
-    off_set = np.transpose(np.reshape(np.array([np.arange(h)] * w * 18 * anchor_num), (18, h, w)), (1, 2, 0))
-    off_set[output_confs == 0] = 0
-    off_set_centroids = off_set[:, :, :2]
-    off_set_corners = off_set[:, :, 2:]
+    output_confs = output[:, :, -1].reshape(h, w, 1)
 
-    output_coord = np.concatenate([(sigmoid_func(output_coord[:, :, :2]) + off_set_centroids), 
-                                   (output_coord[:, :, 2:] + off_set_corners)], 2)
+    output_coord = np.concatenate([sigmoid_func(output_coord[:, :, :2]), output_coord[:, :, 2:]], 2)
     output_confs = sigmoid_func(output_confs)
     output_cls = softmax(output_cls)
 
@@ -212,35 +225,35 @@ def get_region_boxes(output, num_classes):
     for i in range(h):
         for j in range(w):
             max_conf = -1
-            if output_confs[i][j] == 0:
+            if output_confs[i][j][0] == 0:
                 continue
             else:
-                xc = output_coord[i][j][0]
-                yc = output_coord[i][j][1]
-                x1 = output_coord[i][j][2]
-                y1 = output_coord[i][j][3]
-                x2 = output_coord[i][j][4]
-                y2 = output_coord[i][j][5]
-                x3 = output_coord[i][j][6]
-                y3 = output_coord[i][j][7]
-                x4 = output_coord[i][j][8]
-                y4 = output_coord[i][j][9]
-                x5 = output_coord[i][j][10]
-                y5 = output_coord[i][j][11]
-                x6 = output_coord[i][j][12]
-                y6 = output_coord[i][j][13]
-                x7 = output_coord[i][j][14]
-                y7 = output_coord[i][j][15]
-                x8 = output_coord[i][j][16]
-                y8 = output_coord[i][j][17]
-                output_conf = output_confs[i][j]
+                xc = output_coord[i][j][0] + j
+                yc = output_coord[i][j][1] + i
+                x1 = output_coord[i][j][2] + j
+                y1 = output_coord[i][j][3] + i
+                x2 = output_coord[i][j][4] + j
+                y2 = output_coord[i][j][5] + i
+                x3 = output_coord[i][j][6] + j
+                y3 = output_coord[i][j][7] + i
+                x4 = output_coord[i][j][8] + j
+                y4 = output_coord[i][j][9] + i
+                x5 = output_coord[i][j][10] + j
+                y5 = output_coord[i][j][11] + i
+                x6 = output_coord[i][j][12] + j
+                y6 = output_coord[i][j][13] + i
+                x7 = output_coord[i][j][14] + j
+                y7 = output_coord[i][j][15] + i
+                x8 = output_coord[i][j][16] + j
+                y8 = output_coord[i][j][17] + i
+                output_conf = output_confs[i][j][0]
                 if max_conf < output_conf:
                     max_conf = output_conf
                     max_idi, max_idj = i, j
                 cls_max_conf = np.max(output_cls[i][j])
                 cls_max_id, = np.where(output_cls[i][j] == cls_max_conf)
                 cls_max_id = cls_max_id[0]
-            box = [xc/h, yc/w, x1/h, y1/w, x2/h, y2/w, x3/h, y3/w, x4/h, y4/w, x5/h, y5/w, x6/h, y6/w, x7/h, y7/w, x8/h, y8/w, 
+            box = [xc/13, yc/13, x1/13, y1/13, x2/13, y2/13, x3/13, y3/13, x4/13, y4/13, x5/13, y5/13, x6/13, y6/13, x7/13, y7/13, x8/13, y8/13, 
                     output_conf, cls_max_conf, cls_max_id]
             boxes.append(box)
 

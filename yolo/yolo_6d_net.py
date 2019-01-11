@@ -69,11 +69,22 @@ class YOLO6D_net:
         self.logit = self._build_net(self.input_images)
         self.confidence = None
 
+        #predict_coord = tf.reshape(self.logit[:, :, :, :self.boundry_1],   [self.Batch_Size, self.cell_size, self.cell_size, self.num_coord])
+        #labels_coord = tf.reshape(self.labels[:, :, :, 1:self.boundry_1+1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_coord])
+
+        #predict_centroids = predict_coord[:, :, :, :2*self.boxes_per_cell]
+        #predict_corners = predict_coord[:, :, :, 2*self.boxes_per_cell:]
+        #predict_boxes_tran = tf.concat([tf.nn.sigmoid(predict_centroids), predict_corners], 3)
+
+        #Euclid_dist = dist(predict_boxes_tran, labels_coord)
+        #self.confidence = confidence_func(Euclid_dist)
+
         if is_training:
+            print('   compute loss   ')
             self.loss_layer(self.logit, self.labels)
             self.total_loss = tf.losses.get_total_loss()
             tf.summary.scalar('Total loss', self.total_loss)
-
+        
         #self.conf_value = tf.reshape(self.logit[:, :, :, -1], [-1, self.cell_size, self.cell_size, 1])
         self.conf_score = self.confidence_score(self.logit, self.confidence)
 
@@ -220,15 +231,6 @@ class YOLO6D_net:
             response = tf.reshape(labels[:, :, :, 0], [self.Batch_Size, self.cell_size, self.cell_size, 1])
             labels_coord = tf.reshape(labels[:, :, :, 1:self.boundry_1+1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_coord])
             labels_classes = tf.reshape(labels[:, :, :, self.boundry_1+1:], [self.Batch_Size, self.cell_size, self.cell_size, self.num_class])
-
-            ## Offset
-            #off_set = tf.constant(self.off_set, dtype=tf.float32)
-            #off_set = tf.reshape(off_set, [1, self.cell_size, self.cell_size, 18 * self.boxes_per_cell])
-            #off_set = tf.tile(off_set, [self.Batch_Size, 1, 1, 1])  ## off_set shape : [Batch_Size, cell_size, cell_size, 18 * boxes_per_cell]
-            #off_set = tf.multiply(off_set, response_for_coords)
-
-            #off_set_centroids = off_set[:, :, :, :2*self.boxes_per_cell]
-            #off_set_corners = off_set[:, :, :, 2*self.boxes_per_cell:]
 
             predict_boxes_tran = tf.concat([tf.nn.sigmoid(predict_centroids), predict_corners], 3)
             ## predicts coordinates with respect to input images, [Batch_Size, cell_size, cell_size, 18]

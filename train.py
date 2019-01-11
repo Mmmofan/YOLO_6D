@@ -67,9 +67,10 @@ class Solver(object):
 
         #self.options = tf.get_default_graph().get_operations()
         self.variable_to_restore = tf.global_variables()
-        self.variable_to_restore = self.variable_to_restore[:-2]  # remove last 2 tensor
+        self.variable_to_save = tf.global_variables()
+        #self.variable_to_restore = self.variable_to_restore[:-2]  # remove last 2 tensor
         self.restorer = tf.train.Saver(self.variable_to_restore, max_to_keep=3)
-        self.saver = tf.train.Saver(self.variable_to_restore, max_to_keep=3)
+        self.saver = tf.train.Saver(self.variable_to_save, max_to_keep=3)
 
         self.ckpt_file = os.path.join(self.weight_file, 'yolo_6d.ckpt')
         self.summary_op = tf.summary.merge_all()
@@ -79,8 +80,10 @@ class Solver(object):
             'global_step', [], initializer=tf.constant_initializer(0.0), trainable=False)
         self.learning_rate = tf.train.exponential_decay(self.inital_learning_rate, self.global_step, 
                                                         self.decay_steps, self.decay_rate, self.staircase, name='learning_rate')
-        self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate).minimize(
+        self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(
             self.net.total_loss, global_step=self.global_step)
+        #self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate).minimize(
+        #    self.net.total_loss, global_step=self.global_step)
         self.ema = tf.train.ExponentialMovingAverage(decay=0.9999)
         self.averages_op = self.ema.apply(tf.trainable_variables())
         with tf.control_dependencies([self.optimizer]):
@@ -100,6 +103,7 @@ class Solver(object):
 
     def train(self):
 
+        self.variable_to_save = tf.global_variables()
         train_timer = Timer()
         load_timer = Timer()
 
@@ -120,8 +124,8 @@ class Solver(object):
                     train_timer.toc()
 
                     log_str = ('\n   Time:{}, Epoch:{}, Step:{}, Learning rate:{},\n'
-                        '   Loss: {:5.3f},\n   Speed: {:.3f}s/iter,\n'
-                        '   Load: {:.3f}s/iter, Remain: {}').format(
+                        '   Loss: {:5.3f},\n   Speed: {:.3f}s/iter,'
+                        ' Load: {:.3f}s/iter, Remain: {}').format(
                         datetime.datetime.now().strftime('%m/%d %H:%M:%S'),
                         self.epoch,
                         int(step),
@@ -189,8 +193,8 @@ class Solver(object):
         load_timer.toc()
 
         feed_dict = {self.net.input_images: images, self.net.labels: labels}
-        logit, confidence_score = self.sess.run([self.net.logit, self.net.conf_score], feed_dict=feed_dict)  # run
-        predicts = logit  ## Get predict tensor, convert to Numpy array
+        #predicts: [batch, cell, cell, coords + classes + confidence]
+        predicts, confidence_score = self.sess.run([self.net.logit, self.net.conf_score], feed_dict=feed_dict)  # run
 
         testing_error_trans = 0.0
         testing_error_angle = 0.0
@@ -207,21 +211,22 @@ class Solver(object):
         for batch_idx in range(cfg.BATCH_SIZE):
             test_timer.tic()
             conf_sco = confidence_score[batch_idx]
-            pred = predicts[batch_idx] # 3-D
+            logit = predicts[batch_idx] # 3-D
             truth = truths[batch_idx]
             #num_gts = truth[0]
 
             # prune tensors with low confidence (< 0.1)
-            logit = confidence_thresh(conf_sco, pred) 
+            #logit = confidence_thresh(conf_sco, pred) 
 
             # get the maximum of 3x3 neighborhood
-            logit_nms = nms(logit, conf_sco)
+            #logit_nms = nms33(logit, conf_sco)
+            logit = nms(logit, conf_sco)
 
             # compute weighted average of 3x3 neighborhood
             #logit = compute_average(predicts[batch_idx], conf_sco, logit_nms)
 
             # get all the boxes coordinates
-            all_boxes = get_region_boxes(logit_nms, cfg.NUM_CLASSES)
+            all_boxes = get_region_boxes(logit, cfg.NUM_CLASSES)
             #for k in range(num_gts):
             box_gt = [truth[1], truth[2], truth[3], truth[4], truth[5], 
                         truth[6], truth[7], truth[8], truth[9], truth[10],
@@ -334,7 +339,7 @@ def update_config_paths(data_dir, weights_file):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--datacfg', default='cfg/ape.data', type=str)
+    parser.add_argument('--datacfg', default='cfg/', type=str)
     parser.add_argument('--weights', default="YOLO_6D.ckpt", type=str)
     parser.add_argument('--pre', default=False, type=bool)
     parser.add_argument('--data_dir', default="data", type=str)

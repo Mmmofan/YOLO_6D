@@ -163,8 +163,8 @@ class Linemod(object):
             coords = [gt_xc, 13-gt_yc, gt_x7, 13-gt_y7, gt_x6, 13-gt_y6, gt_x5, 13-gt_y5, gt_x4, 13-gt_y4, 
                       gt_x3, 13-gt_y3, gt_x2, 13-gt_y2, gt_x1, 13-gt_y1, gt_x0, 13-gt_y0]
 
-        response_x = int(gt_xc)
-        response_y = int(gt_yc)
+        response_x = int(gt_xc) - 1
+        response_y = int(gt_yc) - 1
 
         # set response value to 1
         labels[response_x, response_y, 0] = 1
@@ -172,9 +172,9 @@ class Linemod(object):
         # set coodinates value
         for i in range(1, 19, 1):
             if i % 2 == 0: # x
-                labels[response_x, response_y, i] = coords[i - 1] - response_x
+                labels[response_x, response_y, i] = coords[i - 1] - response_x + 1
             else: # y
-                labels[response_x, response_y, i] = coords[i - 1] - response_y
+                labels[response_x, response_y, i] = coords[i - 1] - response_y + 1
 
         # set label
         labels[response_x, response_y, 19 + gt_label] = 1
