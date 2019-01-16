@@ -28,7 +28,7 @@ from yolo.yolo_6d_net import YOLO6D_net
 
 
 class Solver(object):
-    
+
     def __init__(self, net, data, arg=None):
 
         #Set parameters for training and testing
@@ -78,7 +78,7 @@ class Solver(object):
 
         self.global_step = tf.get_variable(
             'global_step', [], initializer=tf.constant_initializer(0.0), trainable=False)
-        self.learning_rate = tf.train.exponential_decay(self.inital_learning_rate, self.global_step, 
+        self.learning_rate = tf.train.exponential_decay(self.inital_learning_rate, self.global_step,
                                                         self.decay_steps, self.decay_rate, self.staircase, name='learning_rate')
         self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(
             self.net.total_loss, global_step=self.global_step)
@@ -145,7 +145,7 @@ class Solver(object):
                     #        testing_iters=self.global_step,
                     #        testing_accuracies=self.testing_accuracies,
                     #        testing_errors_pixel=self.testing_errors_pixel,
-                    #        testing_errors_angle=self.testing_errors_angle) 
+                    #        testing_errors_angle=self.testing_errors_angle)
                     if self.testing_accuracies[-1] > self.best_acc:
                         self.best_acc = self.testing_accuracies[-1]
                         print('   best model so far!')
@@ -171,7 +171,7 @@ class Solver(object):
                 datetime.datetime.now().strftime('%m/%d %H:%M:%S')
                 print('   Save checkpoint file to: {}'.format(
                     self.weight_file))
-                self.saver.save(self.sess, self.weight_file, 
+                self.saver.save(self.sess, self.weight_file,
                                 global_step=self.global_step)
 
         print('\n   Save final checkpoint file to: {}'.format(self.weight_file))
@@ -216,7 +216,7 @@ class Solver(object):
             #num_gts = truth[0]
 
             # prune tensors with low confidence (< 0.1)
-            #logit = confidence_thresh(conf_sco, pred) 
+            #logit = confidence_thresh(conf_sco, pred)
 
             # get the maximum of 3x3 neighborhood
             #logit_nms = nms33(logit, conf_sco)
@@ -228,7 +228,7 @@ class Solver(object):
             # get all the boxes coordinates
             all_boxes = get_region_boxes(logit, cfg.NUM_CLASSES)
             #for k in range(num_gts):
-            box_gt = [truth[1], truth[2], truth[3], truth[4], truth[5], 
+            box_gt = [truth[1], truth[2], truth[3], truth[4], truth[5],
                         truth[6], truth[7], truth[8], truth[9], truth[10],
                         truth[11], truth[12], truth[13], truth[14], truth[15],
                         truth[16], truth[17], truth[18], 1.0, 1.0, truth[0]]
@@ -273,18 +273,18 @@ class Solver(object):
             # Compute pixel error
             Rt_gt        = np.concatenate((R_gt, t_gt), axis=1)
             Rt_pr        = np.concatenate((R_pr, t_pr), axis=1)
-            proj_2d_gt   = compute_projection(self.vertices, Rt_gt, self.internal_calibration) 
-            proj_2d_pred = compute_projection(self.vertices, Rt_pr, self.internal_calibration) 
+            proj_2d_gt   = compute_projection(self.vertices, Rt_gt, self.internal_calibration)
+            proj_2d_pred = compute_projection(self.vertices, Rt_pr, self.internal_calibration)
             norm         = np.linalg.norm(proj_2d_gt - proj_2d_pred, axis=0)
             pixel_dist   = np.mean(norm)
             errs_2d.append(pixel_dist)
 
             # Compute 3D distances
-            transform_3d_gt   = compute_transformation(self.vertices, Rt_gt) 
-            transform_3d_pred = compute_transformation(self.vertices, Rt_pr)  
+            transform_3d_gt   = compute_transformation(self.vertices, Rt_gt)
+            transform_3d_pred = compute_transformation(self.vertices, Rt_pr)
             norm3d            = np.linalg.norm(transform_3d_gt - transform_3d_pred, axis=0)
-            vertex_dist       = np.mean(norm3d)    
-            errs_3d.append(vertex_dist)  
+            vertex_dist       = np.mean(norm3d)
+            errs_3d.append(vertex_dist)
 
             # Sum errors
             testing_error_trans  += trans_dist
@@ -315,7 +315,7 @@ class Solver(object):
         self.testing_accuracies.append(acc)
         test_timer.average_time
         load_timer.average_time
-    
+
     def save_config(self):
         with open(os.path.join(self.output_dir, 'config.txt'), 'w') as f:
             cfg_dict = cfg.__dict__
@@ -350,14 +350,14 @@ def main():
 
     if len(args.datacfg) == 0:
         print('No datacfg file specified')
-    
+
     if args.pre:
         cfg.CONF_OBJ_SCALE = 0.0
         cfg.CONF_NOOBJ_SCALE = 0.0
 
     if args.data_dir != cfg.DATA_DIR:
         update_config_paths(args.data_dir, args.weights)
-        
+
     os.environ['CUDA_VISABLE_DEVICES'] = args.gpu
 
     yolo = YOLO6D_net()
@@ -373,5 +373,5 @@ def main():
     #shutil.copy2('%s/model.weights' % (solver.backupdir), '%s/model_backup.weights' % (solver.backupdir))
 
 if __name__ == "__main__":
-    
+
     main()
