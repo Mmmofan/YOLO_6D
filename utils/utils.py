@@ -26,10 +26,10 @@ def softmax(X, theta = 1.0, axis = None):
 
     Parameters
     ----------
-    X: ND-Array. Probably should be floats. 
+    X: ND-Array. Probably should be floats.
     theta (optional): float parameter, used as a multiplier
         prior to exponentiation. Default = 1.0
-    axis (optional): axis to compute values along. Default is the 
+    axis (optional): axis to compute values along. Default is the
         first non-singleton axis.
 
     Returns an array the same size as X. The result will sum to 1
@@ -40,7 +40,7 @@ def softmax(X, theta = 1.0, axis = None):
     # find axis
     if axis is None:
         axis = next(j[0] for j in enumerate(y.shape) if j[1] > 1)
-    # multiply y against the theta parameter, 
+    # multiply y against the theta parameter,
     y = y * float(theta)
     # subtract the max for numerical stability
     y = y - np.expand_dims(np.max(y, axis = axis), axis)
@@ -68,7 +68,7 @@ def confidence_func(x):
 
     temp = tf.cast(x <= dth_in_cell_size, tf.float32)
     confidence = (tf.exp(alpha * (param1 - x / dth_in_cell_size)) - param1) / (tf.exp(alpha) - param1)
-    confidence = tf.multiply(confidence, temp)  
+    confidence = tf.multiply(confidence, temp)
     # if distance in x bigger than threshold, value calculated will be negtive, use above to make the negtive to 0
 
     confidence = tf.reduce_mean(confidence, 3, keep_dims=True)
@@ -81,13 +81,13 @@ def dist(x1, x2):
         x2: 4-D tensor, [batch_size, cell_size, cell_size, 18]
     Return:
     """
-    predict_x = tf.stack([x1[:, :, :, 0], x1[:, :, :, 2], x1[:, :, :, 4], x1[:, :, :, 6],  
+    predict_x = tf.stack([x1[:, :, :, 0], x1[:, :, :, 2], x1[:, :, :, 4], x1[:, :, :, 6],
                             x1[:, :, :, 8], x1[:, :, :, 10], x1[:, :, :, 12], x1[:, :, :, 14], x1[:, :, :, 16]], 3)
-    predict_y = tf.stack([x1[:, :, :, 1], x1[:, :, :, 3], x1[:, :, :, 5], x1[:, :, :, 7],  
+    predict_y = tf.stack([x1[:, :, :, 1], x1[:, :, :, 3], x1[:, :, :, 5], x1[:, :, :, 7],
                             x1[:, :, :, 9], x1[:, :, :, 11], x1[:, :, :, 13], x1[:, :, :, 15], x1[:, :, :, 17]], 3)
-    gt_x = tf.stack([x2[:, :, :, 0], x2[:, :, :, 2], x2[:, :, :, 4], x2[:, :, :, 6], 
+    gt_x = tf.stack([x2[:, :, :, 0], x2[:, :, :, 2], x2[:, :, :, 4], x2[:, :, :, 6],
                         x2[:, :, :, 8], x2[:, :, :, 10], x2[:, :, :, 12], x2[:, :, :, 14], x2[:, :, :, 16]], 3)
-    gt_y = tf.stack([x2[:, :, :, 1], x2[:, :, :, 3], x2[:, :, :, 5], x2[:, :, :, 7], 
+    gt_y = tf.stack([x2[:, :, :, 1], x2[:, :, :, 3], x2[:, :, :, 5], x2[:, :, :, 7],
                         x2[:, :, :, 9], x2[:, :, :, 11], x2[:, :, :, 13], x2[:, :, :, 15], x2[:, :, :, 17]], 3)
     distance = tf.sqrt(tf.add(tf.square(predict_x - gt_x), tf.square(predict_y - gt_y)))
     ### dist: 4-D tensor [batch_size, cell_size, cell_size, 9]
@@ -188,7 +188,7 @@ def nms33(input_tensor, cscs):
         for j in range(1, input_tensor.shape[1]-1, 2):
             temp = cscs[i-1:i+2, j-1:j+2, :]
             temp_max = np.argmax(temp)
-            k, l, __ = np.where(temp == temp_max) 
+            k, l, __ = np.where(temp == temp_max)
             #k, l = k[0], l[0]
             res[k+i-1, l+j-1, :] = 1
     res = np.tile(res, [1, 1, input_tensor.shape[2]])
@@ -211,7 +211,7 @@ def get_region_boxes(output, num_classes):
         A list
     """
     anchor_num = 1
-    
+
     h, w, d = output.shape[0], output.shape[1], output.shape[2]
     output_coord = output[:, :, :18]
     output_cls   = output[:, :, 18:-1]
@@ -253,11 +253,46 @@ def get_region_boxes(output, num_classes):
                 cls_max_conf = np.max(output_cls[i][j])
                 cls_max_id, = np.where(output_cls[i][j] == cls_max_conf)
                 cls_max_id = cls_max_id[0]
-            box = [xc/13, yc/13, x1/13, y1/13, x2/13, y2/13, x3/13, y3/13, x4/13, y4/13, x5/13, y5/13, x6/13, y6/13, x7/13, y7/13, x8/13, y8/13, 
+            box = [xc/13, yc/13, x1/13, y1/13, x2/13, y2/13, x3/13, y3/13, x4/13, y4/13, x5/13, y5/13, x6/13, y6/13, x7/13, y7/13, x8/13, y8/13,
                     output_conf, cls_max_conf, cls_max_id]
             boxes.append(box)
 
     return boxes
+
+def get_predict_boxes(output, num_classes):
+    h, w, _ = output.shape[0], output.shape[1], output.shape[2]
+    output_coord = output[:, :, :18]
+    output_coord = np.concatenate([sigmoid_func(output_coord[:, :, :2]), output_coord[:, :, 2:]], 2)
+    output_cls   = output[:, :, 18:-1]
+    output_conf  = output[:, :, -1]
+
+    max_conf = np.max(output_conf)
+    max_conf_id = np.where(output_conf == max_conf)
+    idi, idj = max_conf_id[0][0], max_conf_id[1][0]
+
+    xc = output_coord[idi][idj][0] + idj
+    yc = output_coord[idi][idj][1] + idi
+    x1 = output_coord[idi][idj][2] + idj
+    y1 = output_coord[idi][idj][3] + idi
+    x2 = output_coord[idi][idj][4] + idj
+    y2 = output_coord[idi][idj][5] + idi
+    x3 = output_coord[idi][idj][6] + idj
+    y3 = output_coord[idi][idj][7] + idi
+    x4 = output_coord[idi][idj][8] + idj
+    y4 = output_coord[idi][idj][9] + idi
+    x5 = output_coord[idi][idj][10] + idj
+    y5 = output_coord[idi][idj][11] + idi
+    x6 = output_coord[idi][idj][12] + idj
+    y6 = output_coord[idi][idj][13] + idi
+    x7 = output_coord[idi][idj][14] + idj
+    y7 = output_coord[idi][idj][15] + idi
+    x8 = output_coord[idi][idj][16] + idj
+    y8 = output_coord[idi][idj][17] + idi
+
+    box = [xc/13, yc/13, x1/13, y1/13, x2/13, y2/13, x3/13, y3/13, x4/13, y4/13,
+           x5/13, y5/13, x6/13, y6/13, x7/13, y7/13, x8/13, y8/13]
+    return box
+
 
 def corner_confidence9(gt_corners, pr_corners, th=80, sharpness=2, im_width=640, im_height=480):
     ''' gt_corners: Ground-truth 2D projections of the 3D bounding box corners, shape: (18,) type: list
@@ -265,13 +300,13 @@ def corner_confidence9(gt_corners, pr_corners, th=80, sharpness=2, im_width=640,
         th        : distance threshold, type: int
         sharpness : sharpness of the exponential that assigns a confidence value to the distance
         -----------
-        return    : a list of shape (9,) with 9 confidence values 
+        return    : a list of shape (9,) with 9 confidence values
     '''
     dist = np.subtract(gt_corners, pr_corners)
     dist = dist.reshape(9, 2)
     dist[:, 0] = dist[:, 0] * im_width
     dist[:, 1] = dist[:, 1] * im_height
-    
+
     eps = 1e-5
     dist  = np.sqrt(np.sum((dist)**2, axis=1))
     mask  = (dist < th)
@@ -279,12 +314,12 @@ def corner_confidence9(gt_corners, pr_corners, th=80, sharpness=2, im_width=640,
     conf0 = np.exp(np.array([sharpness])) - 1 + eps
     conf  = conf / conf0.repeat(18).reshape(9,1)
     # conf = 1.0 - dist/th
-    conf  = mask * conf 
+    conf  = mask * conf
     return np.mean(conf)
 
 def calcAngularDistance(gt_rot, pr_rot):
     rotDiff = np.dot(gt_rot, np.transpose(pr_rot))
-    trace = np.trace(rotDiff) 
+    trace = np.trace(rotDiff)
     return np.rad2deg(np.arccos((trace-1.0)/2.0))
 
 def compute_transformation(points_3D, transformation):
@@ -341,8 +376,8 @@ def read_truths_args(lab_path, min_box_scale):
     truths = read_truths(lab_path)
     new_truths = []
     for i in range(truths.shape[0]):
-        new_truths.append([truths[i][0], truths[i][1], truths[i][2], truths[i][3], truths[i][4], 
-            truths[i][5], truths[i][6], truths[i][7], truths[i][8], truths[i][9], truths[i][10], 
+        new_truths.append([truths[i][0], truths[i][1], truths[i][2], truths[i][3], truths[i][4],
+            truths[i][5], truths[i][6], truths[i][7], truths[i][8], truths[i][9], truths[i][10],
             truths[i][11], truths[i][12], truths[i][13], truths[i][14], truths[i][15], truths[i][16], truths[i][17], truths[i][18]])
     return np.array(new_truths)
 
@@ -379,7 +414,7 @@ def makedirs(path):
         os.makedirs(path)
 
 def get_3D_corners(vertices):
-    
+
     min_x = np.min(vertices[0,:])
     max_x = np.max(vertices[0,:])
     min_y = np.min(vertices[1,:])

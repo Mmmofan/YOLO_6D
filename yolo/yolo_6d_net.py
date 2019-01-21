@@ -56,7 +56,7 @@ class YOLO6D_net:
         """
         self.boundry_1 = 9 * 2 * self.boxes_per_cell   ## Seperate coordinates
         self.boundry_2 = self.num_class
-        
+
         #off_set:  [self.cell_size, self.cell_size, 18]
         self.off_set = np.transpose(np.reshape(np.array(
                                     [np.arange(self.cell_size)] * self.cell_size * 18 * self.boxes_per_cell),
@@ -84,7 +84,7 @@ class YOLO6D_net:
             self.loss_layer(self.logit, self.labels)
             self.total_loss = tf.losses.get_total_loss()
             tf.summary.scalar('Total loss', self.total_loss)
-        
+
         #self.conf_value = tf.reshape(self.logit[:, :, :, -1], [-1, self.cell_size, self.cell_size, 1])
         self.conf_score = self.confidence_score(self.logit, self.confidence)
 
@@ -108,7 +108,7 @@ class YOLO6D_net:
         x = self.conv(x, 1, 1, 128, 'leaky', name='9_conv')
         x = self.conv(x, 3, 1, 256, 'leaky', name='10_conv')
         x = self.max_pool_layer(x, name='11_pool')
-        
+
         x = self.conv(x, 3, 1, 512, 'leaky', name='12_conv')
         x = self.conv(x, 1, 1, 256, 'leaky', name='13_conv')
         x = self.conv(x, 3, 1, 512, 'leaky', name='14_conv')
@@ -127,7 +127,7 @@ class YOLO6D_net:
 
         x_ps = self.conv(x_16, 1, 1, 64, 'leaky', name='25_conv')
         x_ps = self.reorg(x_ps)
-        
+
         x = tf.concat([x, x_ps], 3)
 
         x = self.conv(x, 3, 1, 1024, 'leaky', name='26_conv')
@@ -160,6 +160,7 @@ class YOLO6D_net:
         #weight = self._get_variable("weight", weight_shape, initializer=tf.truncated_normal_initializer(stddev=0.1))
         #bias = self._get_variable("bias", bias_shape, initializer=tf.constant_initializer(0.0))
         y = tf.nn.conv2d(x, weight, strides=strides, padding=pad, name=name)
+        y = tf.add(y, bias)
         if self.Batch_Norm:
             depth = filters
             scale = tf.Variable(tf.ones([depth, ], dtype='float32'), name='scale')
@@ -168,7 +169,7 @@ class YOLO6D_net:
             variance = tf.Variable(tf.ones([depth, ], dtype='float32'), name='rolling_variance')
 
             y = tf.nn.batch_normalization(y, mean, variance, shift, scale, self.EPSILON)
-        y = tf.add(y, bias)
+        
         return y
 
     def max_pool_layer(self, x, name):
@@ -207,7 +208,7 @@ class YOLO6D_net:
             regularizer = tf.contrib.layers.l2_regularizer(self.WEIGHT_DECAY)
         else:
             regularizer = None
-        
+
         return tf.get_variable(name, shape=shape, regularizer=regularizer, initializer=initializer)
 
     def loss_layer(self, predicts, labels, scope='Loss_layer'):

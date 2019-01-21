@@ -14,7 +14,7 @@ Path and Dataset parameters
 DISP = True
 
 ##Files parameters
-DATA_DIR = 'data'  
+DATA_DIR = 'data'
 CACHE_DIR = os.path.join(DATA_DIR, 'cache')
 OUTPUT_DIR = os.path.join(DATA_DIR, 'output')
 WEIGHTS_DIR = os.path.join(DATA_DIR, 'weights')
@@ -51,9 +51,9 @@ COORD_SCALE = 1.0
 #Training parameters
 GPU = '0'
 LEARNING_RATE = 0.0001
-DECAY_STEP = 3200  ## batch_size * 100
+DECAY_STEP = 160
 DECAY_RATE = 0.1
-STAIRCASE = True
+STAIRCASE = False
 MAX_ITER = 15000
 SUMMARY_ITER = 10
 SAVE_ITER = 40

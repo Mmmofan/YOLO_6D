@@ -18,7 +18,6 @@ import numpy as np
 import tensorflow as tf
 
 import yolo.config as cfg
-from Imagenet import ImageNet
 from pascal_voc import Pascal_voc
 from linemod import Linemod
 from utils.MeshPly import MeshPly
@@ -51,9 +50,9 @@ class Solver(object):
         self.net = net
         self.data = data
         self.batch_size = cfg.BATCH_SIZE
-        self.weight_file = cfg.WEIGHTS_FILE
+        self.weight_file = cfg.WEIGHTS_FILE  # data/weights/
         self.max_iter = int(len(data.imgname) / self.batch_size)
-        self.inital_learning_rate = cfg.LEARNING_RATE
+        self.inital_learning_rate = cfg.LEARNING_RATE  # 0.0001
         self.decay_steps = cfg.DECAY_STEP
         self.decay_rate = cfg.DECAY_RATE
         self.staircase = cfg.STAIRCASE
@@ -66,9 +65,8 @@ class Solver(object):
             self.save_config()
 
         #self.options = tf.get_default_graph().get_operations()
-        self.variable_to_restore = tf.global_variables()
+        self.variable_to_restore = tf.global_variables()[:-2]
         self.variable_to_save = tf.global_variables()
-        #self.variable_to_restore = self.variable_to_restore[:-2]  # remove last 2 tensor
         self.restorer = tf.train.Saver(self.variable_to_restore, max_to_keep=3)
         self.saver = tf.train.Saver(self.variable_to_save, max_to_keep=3)
 
@@ -80,10 +78,10 @@ class Solver(object):
             'global_step', [], initializer=tf.constant_initializer(0.0), trainable=False)
         self.learning_rate = tf.train.exponential_decay(self.inital_learning_rate, self.global_step,
                                                         self.decay_steps, self.decay_rate, self.staircase, name='learning_rate')
-        self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(
-            self.net.total_loss, global_step=self.global_step)
-        #self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate).minimize(
+        #self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(
         #    self.net.total_loss, global_step=self.global_step)
+        self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate).minimize(
+            self.net.total_loss, global_step=self.global_step)
         self.ema = tf.train.ExponentialMovingAverage(decay=0.9999)
         self.averages_op = self.ema.apply(tf.trainable_variables())
         with tf.control_dependencies([self.optimizer]):
@@ -220,11 +218,12 @@ class Solver(object):
 
             # get the maximum of 3x3 neighborhood
             #logit_nms = nms33(logit, conf_sco)
-            logit = nms(logit, conf_sco)
+            #logit = nms(logit, conf_sco)
 
             # compute weighted average of 3x3 neighborhood
             #logit = compute_average(predicts[batch_idx], conf_sco, logit_nms)
 
+            """
             # get all the boxes coordinates
             all_boxes = get_region_boxes(logit, cfg.NUM_CLASSES)
             #for k in range(num_gts):
@@ -240,6 +239,17 @@ class Solver(object):
                     best_conf_est = all_boxes[j][18]
                     box_pr = all_boxes[j]
                     #match = corner_confidence9(box_gt[:18], all_boxes[j][:18])
+            """
+
+            # get all the boxes coordinates
+            # 1st: ground true boxes
+            box_gt = [truth[1], truth[2], truth[3], truth[4], truth[5],
+                      truth[6], truth[7], truth[8], truth[9], truth[10],
+                      truth[11], truth[12], truth[13], truth[14], truth[15],
+                      truth[16], truth[17], truth[18], 1.0, 1.0, truth[0]]
+
+            # 2nd: predict boxes
+            box_pr = get_predict_boxes(logit, cfg.NUM_CLASSES)
 
             #denomalize the corner prediction
             corners2D_gt = np.array(np.reshape(box_gt[:18], [9, 2]), dtype='float32')
@@ -339,7 +349,7 @@ def update_config_paths(data_dir, weights_file):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--datacfg', default='cfg/', type=str)
+    parser.add_argument('--datacfg', default='cfg/ape.data', type=str)
     parser.add_argument('--weights', default="YOLO_6D.ckpt", type=str)
     parser.add_argument('--pre', default=False, type=bool)
     parser.add_argument('--data_dir', default="data", type=str)
