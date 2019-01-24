@@ -80,7 +80,6 @@ class YOLO6D_net:
         #self.confidence = confidence_func(Euclid_dist)
 
         if is_training:
-            print('   compute loss   ')
             self.loss_layer(self.logit, self.labels)
             self.total_loss = tf.losses.get_total_loss()
             tf.summary.scalar('Total loss', self.total_loss)
@@ -91,7 +90,7 @@ class YOLO6D_net:
 
     def _build_net(self, input):
         if self.disp:
-            print("--------Building network---------")
+            print("\n--------Building network---------")
         self.Batch_Norm = True
         x = self.conv(input, 3, 1, 32, 'leaky', name='0_conv')
         x = self.max_pool_layer(x, name='1_pool')
@@ -135,7 +134,7 @@ class YOLO6D_net:
         x = self.conv(x, 1, 1, 18 + 1 + self.num_class, 'linear', name='27_conv') ## 9 points 1 confidence C classes
 
         if self.disp:
-            print("----Building network complete----")
+            print("----Building network complete----\n")
 
         return x
 
@@ -169,7 +168,7 @@ class YOLO6D_net:
             variance = tf.Variable(tf.ones([depth, ], dtype='float32'), name='rolling_variance')
 
             y = tf.nn.batch_normalization(y, mean, variance, shift, scale, self.EPSILON)
-        
+
         return y
 
     def max_pool_layer(self, x, name):
@@ -197,7 +196,6 @@ class YOLO6D_net:
 
     def _get_variable(self, name, shape, initializer):
         """
-        创建一个函数获取变量，方便进行正则化处理等
         """
         param = 1
         for i in range(0, len(shape)):

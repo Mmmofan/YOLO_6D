@@ -5,12 +5,10 @@
 # @Email: fmo@nullmax.ai
 # ---------------------
 
-import copy
 import os
-
+import random
 import cv2
 import numpy as np
-import tensorflow as tf
 
 import yolo.config as cfg
 from utils.utils import *
@@ -35,6 +33,10 @@ class Linemod(object):
         self.image_size = cfg.IMAGE_SIZE
         self.image_width = 640   # axis x
         self.image_height = 480   # axis y
+        self.mask_path = 'LINEMOD/' + self.dataset_name + '/mask/'
+        self.mask_files = None
+        self.bg_txt = 'VOCdevkit/VOC2012/ImageSets/Layout/trainval.txt'
+        self.bg_files = None
 
         self.cell_size = cfg.CELL_SIZE
         self.boxes_per_cell = cfg.BOXES_PER_CELL
@@ -46,11 +48,11 @@ class Linemod(object):
         self.train_gt_labels = None
         self.test_gt_labels = None
         self.gt_labels = None
-        self.epoch = 0
         self.batch = 0
-        print("---------Loading dataset---------")
+        print("\n---------------Loading dataset---------------")
         self.prepare()  # get the image files name and label files name
-        print("----Loading dataset complete-----")
+        # print(len(self.bg_files))
+        print("----------Loading dataset complete-----------\n")
 
     def prepare(self):
         """
@@ -69,12 +71,22 @@ class Linemod(object):
         else:
             print('\n   Wrong phase...\n   Try again...')
 
+        for ro, _, fi in os.walk(self.mask_path):
+            root, __, files = ro, _, fi
+        self.mask_files = files
+
+        with open(self.bg_txt, 'r') as f:
+            self.bg_files = [x.split()[0] for x in f.readlines()]
+
     def next_batches(self):
         images = np.zeros((self.batch_size, 416, 416, 3), np.float32)
         labels = np.zeros((self.batch_size, 13, 13, 1 + self.boxes_per_cell*9*2 + self.num_classes), np.float32)
 
+        # for idx in range(self.batch_size):
+            # images[idx] = self.image_read(self.imgname[idx + self.batch * self.batch_size], self.flipped)
+            # labels[idx] = self.label_read(self.gt_labels[idx + self.batch * self.batch_size], self.flipped)
         for idx in range(self.batch_size):
-            images[idx] = self.image_read(self.imgname[idx + self.batch * self.batch_size], self.flipped)
+            images[idx] = self.image_bg_replace(self.imgname[idx+self.batch*self.batch_size][-8:-3], self.flipped)
             labels[idx] = self.label_read(self.gt_labels[idx + self.batch * self.batch_size], self.flipped)
 
         self.batch += 1
@@ -85,7 +97,7 @@ class Linemod(object):
         labels = np.zeros((self.batch_size, 13, 13, 32), np.float32)
 
         for idx in range(self.batch_size):
-            images[idx] = self.image_read(self.imgname[idx + self.batch * self.batch_size], self.flipped)
+            images[idx] = self.image_bg_replace(self.imgname[idx+self.batch*self.batch_size][-8:-3], self.flipped)
             labels[idx] = self.label_read(self.gt_labels[idx + self.batch * self.batch_size], self.flipped)
 
         return images, labels
@@ -113,6 +125,33 @@ class Linemod(object):
             labels[0] = int(labels[0])
             gt_labels.append(labels)
         return gt_labels
+
+    def image_bg_replace(self, imgname, flipped):
+        imgname += 'png'
+        mask_path = self.mask_path + imgname
+        mask = cv2.imread(os.path.join(mask_path, imgname))
+
+        rand_num = random.randint(0, 840)
+        bg_file = self.bg_files[rand_num]
+        bg_file_path = 'VOCdevkit/VOC2012/JPEGImages/' + bg_file + '.jpg'
+        bg = cv2.imread(bg_file_path)
+        bg = cv2.resize(bg, (640, 480))
+
+        obj_path = 'LINEMOD/' + self.dataset_name + '/JPEGImages/' + '00' + imgname[:-3] + 'jpg'
+        obj = cv2.imread(obj_path)
+
+        obj[mask == 0] = 0
+        bg[mask == 255] = 0
+        res = obj + bg
+
+        res = cv2.resize(res, (self.image_size, self.image_size))
+        res = cv2.cvtColor(res, cv2.COLOR_BGR2RGB).astype(np.float32)
+        res = (res / 255.0) * 2.0 - 1.0
+
+        if flipped:
+            res = cv2.flip(res, 0)
+
+        return res
 
     def image_read(self, imgname, flipped):
         image = cv2.imread(imgname)
@@ -180,3 +219,4 @@ class Linemod(object):
         labels[response_x, response_y, 19 + gt_label] = 1
 
         return labels
+
