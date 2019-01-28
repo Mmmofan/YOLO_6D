@@ -245,12 +245,13 @@ class YOLO6D_net:
 
             object_coef = tf.constant(self.obj_scale, dtype=tf.float32)
             noobject_coef = tf.constant(self.noobj_scale, dtype=tf.float32)
-            conf_mask = tf.ones_like(response) * noobject_coef + response * object_coef # [batch. cell, cell, 1] with object:5.0, no object:0.1
+            conf_coef = tf.ones_like(response) * noobject_coef + response * object_coef # [batch. cell, cell, 1] with object:5.0, no object:0.1
+            coords_coef = tf.tile(response, [1, 1, 1, self.num_coord])
 
             ## coordinates loss
             coord_loss = tf.losses.mean_squared_error(labels_coord, predict_boxes_tran, weights=response, scope='Coord_Loss')
             ## confidence loss, the loss between output confidence value and compute confidence
-            conf_loss = tf.losses.mean_squared_error(self.confidence, predict_conf, weights=conf_mask, scope='Conf_Loss')
+            conf_loss = tf.losses.mean_squared_error(self.confidence, predict_conf, weights=conf_coef, scope='Conf_Loss')
             ## classification loss
             class_loss = tf.losses.softmax_cross_entropy(labels_classes, predict_classes, weights=self.class_scale, scope='Class_Loss')
 
