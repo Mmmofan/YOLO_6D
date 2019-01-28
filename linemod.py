@@ -50,33 +50,35 @@ class Linemod(object):
         self.gt_labels = None
         self.batch = 0
         print("\n---------------Loading dataset---------------")
-        self.prepare()  # get the image files name and label files name
+        self.prepare(self.phase)  # get the image files name and label files name
         # print(len(self.bg_files))
         print("----------Loading dataset complete-----------\n")
 
-    def prepare(self):
+    def prepare(self, phase):
         """
         self.imgname: A list of all training image files
         self.gt_labels: A list of all ground true labels(which elements are lists like [[1,xx,xx,...],[1,xx,xx,...]] with integer and float numbers)
         these two matched respectively
         """
-        if self.phase == 'train':
+        if phase == 'train':
             with open(self.trainlist, 'r') as f:
                 self.imgname = [x.strip() for x in f.readlines()]  # a list of trianing files
             self.gt_labels = self.load_labels() # a list of all labels with respect to imgname
-        elif self.phase == 'test':
+
+            for ro, _, fi in os.walk(self.mask_path):
+                root, __, files = ro, _, fi
+            self.mask_files = files
+
+            with open(self.bg_txt, 'r') as f:
+                self.bg_files = [x.split()[0] for x in f.readlines()]
+
+        elif phase == 'test':
             with open(self.testlist, 'r') as f:
                 self.imgname = [x.strip() for x in f.readlines()]
             self.gt_labels = self.load_labels()
+
         else:
             print('\n   Wrong phase...\n   Try again...')
-
-        for ro, _, fi in os.walk(self.mask_path):
-            root, __, files = ro, _, fi
-        self.mask_files = files
-
-        with open(self.bg_txt, 'r') as f:
-            self.bg_files = [x.split()[0] for x in f.readlines()]
 
     def next_batches(self):
         images = np.zeros((self.batch_size, 416, 416, 3), np.float32)

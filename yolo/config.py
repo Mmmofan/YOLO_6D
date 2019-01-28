@@ -18,7 +18,7 @@ DATA_DIR = 'data'
 CACHE_DIR = os.path.join(DATA_DIR, 'cache')
 OUTPUT_DIR = os.path.join(DATA_DIR, 'output')
 WEIGHTS_DIR = os.path.join(DATA_DIR, 'weights')
-WEIGHTS_FILE = os.path.join(WEIGHTS_DIR, 'yolo_6d.ckpt')
+WEIGHTS_FILE = os.path.join(WEIGHTS_DIR, 'yolo_6d_ape.ckpt')
 
 FLIPPED = True
 

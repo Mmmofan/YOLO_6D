@@ -68,6 +68,7 @@ class YOLO6D_net:
 
         self.logit = self._build_net(self.input_images)
         self.confidence = None
+        self.Euclid_dist = None
 
         #predict_coord = tf.reshape(self.logit[:, :, :, :self.boundry_1],   [self.Batch_Size, self.cell_size, self.cell_size, self.num_coord])
         #labels_coord = tf.reshape(self.labels[:, :, :, 1:self.boundry_1+1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_coord])
@@ -85,7 +86,7 @@ class YOLO6D_net:
             tf.summary.scalar('Total loss', self.total_loss)
 
         #self.conf_value = tf.reshape(self.logit[:, :, :, -1], [-1, self.cell_size, self.cell_size, 1])
-        self.conf_score = self.confidence_score(self.logit, self.confidence)
+        # self.conf_score = self.confidence_score(self.logit, self.confidence)
 
 
     def _build_net(self, input):
@@ -140,7 +141,7 @@ class YOLO6D_net:
 
     def conv(self, x, kernel_size, strides, filters, activation, name, pad='SAME'):
         """
-        Conv ==>Batch_Norm==>Activation
+        Conv ==>Batch_Norm==>Bias, no activation
         """
         #with tf.variable_scope('Net'):
         x = self.conv_layer(x, kernel_size, strides, filters, name=name, pad='SAME')
@@ -159,7 +160,7 @@ class YOLO6D_net:
         #weight = self._get_variable("weight", weight_shape, initializer=tf.truncated_normal_initializer(stddev=0.1))
         #bias = self._get_variable("bias", bias_shape, initializer=tf.constant_initializer(0.0))
         y = tf.nn.conv2d(x, weight, strides=strides, padding=pad, name=name)
-        y = tf.add(y, bias)
+
         if self.Batch_Norm:
             depth = filters
             scale = tf.Variable(tf.ones([depth, ], dtype='float32'), name='scale')
@@ -168,6 +169,8 @@ class YOLO6D_net:
             variance = tf.Variable(tf.ones([depth, ], dtype='float32'), name='rolling_variance')
 
             y = tf.nn.batch_normalization(y, mean, variance, shift, scale, self.EPSILON)
+
+        y = tf.add(y, bias)
 
         return y
 
@@ -234,10 +237,10 @@ class YOLO6D_net:
             predict_boxes_tran = tf.concat([tf.nn.sigmoid(predict_centroids), predict_corners], 3)
             ## predicts coordinates with respect to input images, [Batch_Size, cell_size, cell_size, 18]
             ## output is offset with respect to centroid, so has to add the centroid coord(top-left corners of every cell)
-            ## see paper section3.2
 
+            ## see paper section3.2
             ## Calculate confidence (instead of IoU like in YOLOv2)
-            Euclid_dist = dist(predict_boxes_tran, labels_coord)
+            self.Euclid_dist = dist(predict_boxes_tran, labels_coord)
             self.confidence = confidence_func(Euclid_dist)
 
             object_coef = tf.constant(self.obj_scale, dtype=tf.float32)
@@ -277,3 +280,8 @@ class YOLO6D_net:
         """
         self.is_training = False
         self.Batch_Norm = False
+
+    def evaluation_off(self):
+        self.is_training = True
+        self.Batch_Norm = True
+

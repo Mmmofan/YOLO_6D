@@ -10,6 +10,7 @@ from __future__ import print_function
 
 import argparse
 import datetime
+import time
 import os
 
 import numpy as np
@@ -60,8 +61,7 @@ class Solver(object):
         if self.saveconfig:
             self.save_config()
 
-        #self.options = tf.get_default_graph().get_operations()
-        self.variable_to_restore = tf.global_variables()[:-2]
+        self.variable_to_restore = tf.global_variables()
         self.variable_to_save = tf.global_variables()
         self.restorer = tf.train.Saver(self.variable_to_restore, max_to_keep=3)
         self.saver = tf.train.Saver(self.variable_to_save, max_to_keep=3)
@@ -78,7 +78,7 @@ class Solver(object):
         #    self.net.total_loss, global_step=self.global_step)
         self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate).minimize(
             self.net.total_loss, global_step=self.global_step)
-        self.ema = tf.train.ExponentialMovingAverage(decay=0.9999)
+        self.ema = tf.train.ExponentialMovingAverage(decay=0.999)
         self.averages_op = self.ema.apply(tf.trainable_variables())
         with tf.control_dependencies([self.optimizer]):
             self.train_op = tf.group(self.averages_op)
@@ -87,6 +87,7 @@ class Solver(object):
         config = tf.ConfigProto(gpu_options=gpu_options)
         self.sess = tf.Session(config=config)
         self.sess.run(tf.global_variables_initializer())
+        print(self.net.confidence)
         if self.weight_file is not None:
             print('\n----------Restoring weights from: {}------------'.format(self.weight_file))
             self.restorer.restore(self.sess, self.weight_file)
@@ -95,7 +96,7 @@ class Solver(object):
 
 
     def train(self):
-
+        self.net.evaluation_off()
         self.variable_to_save = tf.global_variables()
         train_timer = Timer()
         load_timer = Timer()
@@ -185,8 +186,8 @@ class Solver(object):
 
         feed_dict = {self.net.input_images: images, self.net.labels: labels}
         #predicts: [batch, cell, cell, coords + classes + confidence]
-        predicts, confidence_score = self.sess.run([self.net.logit, self.net.conf_score], feed_dict=feed_dict)  # run
-
+        predicts = self.sess.run(self.net.logit, feed_dict=feed_dict)  # run
+        confidence = predicts[:, :, :, -1]
         testing_error_trans = 0.0
         testing_error_angle = 0.0
         testing_error_pixel = 0.0
@@ -343,7 +344,7 @@ def update_config_paths(data_dir, weights_file):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--datacfg', default='', type=str)
+    parser.add_argument('--datacfg', default='cfg/ape.data', type=str)
     parser.add_argument('--weights', default="yolo_6d.ckpt", type=str)
     parser.add_argument('--pre', default=False, type=bool)
     parser.add_argument('--data_dir', default="data", type=str)
@@ -370,7 +371,10 @@ def main():
     solver = Solver(yolo, datasets, arg=args.datacfg)
 
     print("\n-----------------------------start training----------------------------")
+    tic = time.clock()
     solver.train()
+    toc = time.clock()
+    print("All training time: {}h".format((toc - tic) / 3600.0))
     print("------------------------------training end-----------------------------\n")
 
 if __name__ == "__main__":
