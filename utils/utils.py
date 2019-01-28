@@ -54,6 +54,22 @@ def softmax(X, theta = 1.0, axis = None):
     if len(X.shape) == 1: p = p.flatten()
     return p
 
+def cross_entropy(logit, label, weights):
+    """
+    logit: output [B, C, C, classes]
+    label: ground truth [B, C, C, classes]
+    weigth: [B, C, C, 1]
+    """
+    logit = tf.clip_by_value(logit, 1e-10, 1.0)
+    logit_shape = logit.get_shape()
+    label_shape = label.get_shape()
+    assert(logit_shape == label_shape)
+    weight = tf.tile(weights, [1, 1, 1, logit_shape[-1]])
+    
+    cross_entropy_loss = tf.reduce_sum(tf.multiply(tf.multiply(label, tf.log(logit)), weight))
+
+    return cross_entropy
+
 def confidence_func(x):
     """
     Args:
