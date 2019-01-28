@@ -65,10 +65,10 @@ def cross_entropy(logit, label, weights):
     label_shape = label.get_shape()
     assert(logit_shape == label_shape)
     weight = tf.tile(weights, [1, 1, 1, logit_shape[-1]])
-    
+
     cross_entropy_loss = tf.reduce_sum(tf.multiply(tf.multiply(label, tf.log(logit)), weight))
 
-    return cross_entropy
+    return cross_entropy_loss
 
 def confidence_func(x):
     """

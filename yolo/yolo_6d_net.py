@@ -73,19 +73,8 @@ class YOLO6D_net:
         self.confidence = None
         self.Euclid_dist = None
 
-        #predict_coord = tf.reshape(self.logit[:, :, :, :self.boundry_1],   [self.Batch_Size, self.cell_size, self.cell_size, self.num_coord])
-        #labels_coord = tf.reshape(self.labels[:, :, :, 1:self.boundry_1+1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_coord])
-
-        #predict_centroids = predict_coord[:, :, :, :2*self.boxes_per_cell]
-        #predict_corners = predict_coord[:, :, :, 2*self.boxes_per_cell:]
-        #predict_boxes_tran = tf.concat([tf.nn.sigmoid(predict_centroids), predict_corners], 3)
-
-        #Euclid_dist = dist(predict_boxes_tran, labels_coord)
-        #self.confidence = confidence_func(Euclid_dist)
-
         if is_training:
-            self.loss_layer(self.logit, self.labels)
-            self.total_loss = tf.losses.get_total_loss()
+            self.total_loss = self.loss_layer(self.logit, self.labels)
             tf.summary.scalar('Total loss', self.total_loss)
 
         #self.conf_value = tf.reshape(self.logit[:, :, :, -1], [-1, self.cell_size, self.cell_size, 1])
@@ -162,8 +151,8 @@ class YOLO6D_net:
             depth = filters
             scale = tf.Variable(tf.ones([depth, ], dtype='float32'), name='scale')
             shift = tf.Variable(tf.zeros([depth, ], dtype='float32'), name='shift')
-            mean = tf.Variable(tf.one([depth, ], dtype='float32'), name='rolling_mean')
-            variance = tf.Variable(tf.ones([depty, ], dtype='float32'), name='rolling_variance')
+            mean = tf.Variable(tf.ones([depth, ], dtype='float32'), name='rolling_mean')
+            variance = tf.Variable(tf.ones([depth, ], dtype='float32'), name='rolling_variance')
 
             x = tf.nn.batch_normalization(x, mean, variance, shift, scale, self.EPSILON)
 
@@ -230,7 +219,7 @@ class YOLO6D_net:
             ## see paper section3.2
             ## Calculate confidence (instead of IoU like in YOLOv2)
             self.Euclid_dist = dist(predict_boxes_tran, labels_coord)
-            self.confidence = confidence_func(Euclid_dist)
+            self.confidence = confidence_func(self.Euclid_dist)
 
             object_coef = tf.constant(self.obj_scale, dtype=tf.float32)
             noobject_coef = tf.constant(self.noobj_scale, dtype=tf.float32)
@@ -244,16 +233,19 @@ class YOLO6D_net:
             ## confidence loss, the loss between output confidence value and compute confidence
             conf_loss = tf.losses.mean_squared_error(self.confidence, predict_conf, weights=conf_coef, scope='Conf_Loss')
             ## coordinates loss
-            coord_loss = tf.losses.mean_squared_error(labels_coord, predict_boxes_tran, scope='Coord_Loss')
+            coord_loss = tf.losses.mean_squared_error(labels_coord, predict_boxes_tran, weights=coords_coef, scope='Coord_Loss')
             ## classification loss
             class_loss =cross_entropy(labels_classes, predict_classes, weights=class_coef)
 
-            reg_term = tf.contrib.layers.apply_regularization(self.reg_l2, weights_list=tf.GraphKeys.WEIGHTS)
+            reg_term = tf.contrib.layers.apply_regularization(self.reg_l2)
 
-            tf.losses.add_loss(coord_loss)
-            tf.losses.add_loss(conf_loss)
-            tf.losses.add_loss(class_loss)
-            tf.losses.add_loss(reg_term)
+            # tf.losses.add_loss(coord_loss)
+            # tf.losses.add_loss(conf_loss)
+            # tf.losses.add_loss(class_loss)
+            # tf.losses.add_loss(reg_term)
+            loss = conf_loss + coord_loss + class_loss + reg_term
+            return loss
+
 
     def confidence_score(self, predicts, confidence):
         """
