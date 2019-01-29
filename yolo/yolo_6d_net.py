@@ -216,7 +216,7 @@ class YOLO6D_net:
             ## see paper section3.2
             ## Calculate confidence (instead of IoU like in YOLOv2)
             self.Euclid_dist = dist(predict_boxes_tran, labels_coord)
-            self.confidence = confidence_func(self.Euclid_dist)
+            self.confidence = confidence_func(self.Euclid_dist, response)
 
             object_coef = tf.constant(self.obj_scale, dtype=tf.float32)
             noobject_coef = tf.constant(self.noobj_scale, dtype=tf.float32)
@@ -232,7 +232,7 @@ class YOLO6D_net:
             ## coordinates loss
             coord_loss = tf.losses.mean_squared_error(labels_coord, predict_boxes_tran, weights=coords_coef, scope='Coord_Loss')
             ## classification loss
-            class_loss =cross_entropy(labels_classes, predict_classes, weights=class_coef)
+            class_loss = cross_entropy(labels_classes, predict_classes, weights=class_coef)
 
             # tf.losses.add_loss(coord_loss)
             # tf.losses.add_loss(conf_loss)

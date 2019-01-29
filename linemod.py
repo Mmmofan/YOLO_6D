@@ -131,23 +131,25 @@ class Linemod(object):
     def image_bg_replace(self, imgname, flipped):
         imgname += 'png'
         mask_path = self.mask_path + imgname
-        mask = cv2.imread(os.path.join(mask_path, imgname))
+        mask = cv2.imread(mask_path)
+        mask = cv2.resize(mask, (self.image_size, self.image_size))
 
         rand_num = random.randint(0, 840)
         bg_file = self.bg_files[rand_num]
         bg_file_path = 'VOCdevkit/VOC2012/JPEGImages/' + bg_file + '.jpg'
         bg = cv2.imread(bg_file_path)
-        bg = cv2.resize(bg, (640, 480))
+        bg = cv2.resize(bg, (self.image_size, self.image_size))
 
         obj_path = 'LINEMOD/' + self.dataset_name + '/JPEGImages/' + '00' + imgname[:-3] + 'jpg'
         obj = cv2.imread(obj_path)
+        obj = cv2.resize(obj, (self.image_size, self.image_size))
 
         obj[mask == 0] = 0
         bg[mask == 255] = 0
         res = obj + bg
 
-        res = cv2.resize(res, (self.image_size, self.image_size))
-        res = cv2.cvtColor(res, cv2.COLOR_BGR2RGB).astype(np.float32)
+        cv2.imwrite("replaced.jpg", res)
+        #res = cv2.cvtColor(res, cv2.COLOR_BGR2RGB).astype(np.float32)
         res = (res / 255.0) * 2.0 - 1.0
 
         if flipped:
@@ -208,7 +210,7 @@ class Linemod(object):
         response_y = int(gt_yc)
 
         # set response value to 1
-        labels[response_x, response_y, 0] = 1
+        labels[response_x, response_y, 0] = 1.0
 
         # set coodinates value
         for i in range(1, 19, 1):
