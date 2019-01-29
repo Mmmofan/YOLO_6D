@@ -50,8 +50,6 @@ class YOLO6D_net:
         self.cell_size = cfg.CELL_SIZE
         self.num_coord = cfg.NUM_COORD  ## 18: 9 points, 8 corners + 1 centroid
 
-        self.reg_l2 = tf.contrib.layers.l2_regularizer(self.WEIGHT_DECAY)
-
         self.obj_scale = cfg.CONF_OBJ_SCALE
         self.noobj_scale = cfg.CONF_NOOBJ_SCALE
         self.class_scale = cfg.CLASS_SCALE
@@ -144,7 +142,6 @@ class YOLO6D_net:
         stride = [strides, strides, strides, strides]
         weight = tf.Variable(tf.truncated_normal(weight_shape, stddev=0.1), name='weight')
         bias = tf.Variable(tf.constant(0.1, shape=bias_shape), name='biases')
-        tf.add_to_collection(tf.GraphKeys.WEIGHTS, weight)
 
         x = tf.nn.conv2d(x, weight, strides=stride, padding=pad, name=name)
         if self.Batch_Norm:
@@ -237,13 +234,11 @@ class YOLO6D_net:
             ## classification loss
             class_loss =cross_entropy(labels_classes, predict_classes, weights=class_coef)
 
-            reg_term = tf.contrib.layers.apply_regularization(self.reg_l2)
-
             # tf.losses.add_loss(coord_loss)
             # tf.losses.add_loss(conf_loss)
             # tf.losses.add_loss(class_loss)
             # tf.losses.add_loss(reg_term)
-            loss = conf_loss + coord_loss + class_loss + reg_term
+            loss = conf_loss + coord_loss + class_loss
             return loss
 
 
