@@ -17,7 +17,6 @@ import numpy as np
 import tensorflow as tf
 
 import yolo.config as cfg
-from pascal_voc import Pascal_voc
 from linemod import Linemod
 from utils.MeshPly import MeshPly
 from utils.timer import Timer
@@ -27,7 +26,7 @@ from yolo.yolo_6d_net import YOLO6D_net
 
 class Solver(object):
 
-    def __init__(self, net, data, arg=None):
+    def __init__(self, net, data, tfrecord, arg=None):
 
         #Set parameters for training and testing
         self.meshname = data.meshname
@@ -47,6 +46,8 @@ class Solver(object):
         self.saveconfig = False
         self.net = net
         self.data = data
+        self.reader = tf.TFRecordReader()
+        self.tfrecords = 'data/train.tfrecord'
         self.batch_size = cfg.BATCH_SIZE
         self.epoch = cfg.EPOCH
         self.weight_file = cfg.WEIGHTS_FILE  # data/weights/
@@ -70,16 +71,16 @@ class Solver(object):
         self.summary_op = tf.summary.merge_all()
         self.writer = tf.summary.FileWriter(self.output_dir, flush_secs=60)
 
-        self.global_step = tf.get_variable(
-            'global_step', [], initializer=tf.constant_initializer(0.0), trainable=False)
+        #self.global_step = tf.get_variable('global_step', [], initializer=tf.constant_initializer(0.0), trainable=False)
+        self.global_step = tf.Variable(0, name='global_step', trainable=False)
         # self.learning_rate = tf.train.exponential_decay(self.inital_learning_rate, self.global_step,
                                                         # self.decay_steps, self.decay_rate, self.staircase, name='learning_rate')
         if arg.pre:
             boundaries = [1, 50, 1000, 2000]
-            learning_rate = [0.0001, 0.001, 0.0001, 0.00001]
+            learning_rate = [0.001, 0.0001, 0.001, 0.0001, 0.00001]
         else:
             boundaries = [1, 50, 3000, 6000]
-            learning_rate = [0.0001, 0.001, 0.0001, 0.00001]
+            learning_rate = [0.001, 0.0001, 0.001, 0.0001, 0.00001]
         self.learning_rate = tf.train.piecewise_constant(self.global_step, boundaries, learning_rate, name='learning_rate')
         #self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(
         #    self.net.total_loss, global_step=self.global_step)
@@ -107,12 +108,31 @@ class Solver(object):
         self.net.evaluation_off()
         train_timer = Timer()
         load_timer = Timer()
+        file_name_queue = tf.train.string_input_producer([self.tfrecords], num_epochs=None)
+        __, serialized_example = self.reader.read(file_name_queue)
+        features = tf.parse_single_example(serialized_example,
+                                           features={
+                                               'labels':tf.FixedLenFeature([], tf.string),
+                                               'images':tf.FixedLenFeature([], tf.string),
+                                           })
 
         epoch = 0
         while epoch <= self.epoch:
             for step in range(0, self.max_iter-1):
                 load_timer.tic()
-                images, labels = self.data.next_batches()
+                # images, labels = self.data.next_batches()
+
+                images = tf.decode_raw(features['images'], tf.float32)
+                labels = tf.decode_raw(features['labels'], tf.float32)
+                if True:
+                    batch = self.batch_size
+                    min_after_dequeue = 10
+                    capacity = min_after_dequeue + 3 * batch
+                    images, labels = tf.train.shuffle_batch([images, labels],
+                                                            batch_size=batch,
+                                                            num_threads=3,
+                                                            capacity=capacity,
+                                                            min_after_dequeue=min_after_dequeue)
                 load_timer.toc()
 
                 feed_dict = {self.net.input_images: images, self.net.labels: labels}
@@ -187,7 +207,26 @@ class Solver(object):
         eps = 1e-5
 
         load_timer.tic()
-        images, labels = self.data.next_batches_test()
+        # images, labels = self.data.next_batches_test()
+
+        file_name_queue = tf.train.string_input_producer([self.tfrecords], num_epochs=None)
+        __, serialized_example = self.reader.read(file_name_queue)
+        features = tf.parse_single_example(serialized_example,
+                                           features={
+                                               'labels':tf.FixedLenFeature([], tf.string),
+                                               'images':tf.FixedLenFeature([], tf.string),
+                                           })
+        images = tf.decode_raw(features['images'], tf.float32)
+        labels = tf.decode_raw(features['labels'], tf.float32)
+        if True:
+            batch = self.batch_size
+            min_after_dequeue = 10
+            capacity = min_after_dequeue + 3 * batch
+            images, labels = tf.train.shuffle_batch([images, labels],
+                                                    batch_size=batch,
+                                                    num_threads=3,
+                                                    capacity=capacity,
+                                                    min_after_dequeue=min_after_dequeue)
         truths = self.data.get_truths() #2-D [Batch, params]
         load_timer.toc()
 
@@ -355,8 +394,6 @@ def main():
     parser.add_argument('--weights', default="yolo_6d.ckpt", type=str)
     parser.add_argument('--pre', default=False, type=bool)
     parser.add_argument('--data_dir', default="data", type=str)
-    parser.add_argument('--threshold', default=0.2, type=float)
-    parser.add_argument('--iou_threshold', default=0.5, type=float)
     parser.add_argument('--gpu', default='0', type=str)
     args = parser.parse_args()
 
@@ -375,7 +412,9 @@ def main():
 
     yolo = YOLO6D_net()
     datasets = Linemod('train', arg=args.datacfg)
-    solver = Solver(yolo, datasets, arg=args)
+    tfrecords = 'data/train.tfrecords'
+    # solver = Solver(yolo, datasets, arg=args)
+    solver = Solver(yolo, datasets, tfrecords, arg=args)
 
     print("\n-----------------------------start training----------------------------")
     tic = time.clock()
