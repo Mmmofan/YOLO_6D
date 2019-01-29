@@ -51,7 +51,7 @@ class Solver(object):
         self.epoch = cfg.EPOCH
         self.weight_file = cfg.WEIGHTS_FILE  # data/weights/
         self.max_iter = int(len(data.imgname) / self.batch_size)
-        self.inital_learning_rate = cfg.LEARNING_RATE  # 0.0001
+        self.inital_learning_rate = cfg.LEARNING_RATE  # 0.001
         self.decay_steps = cfg.DECAY_STEP
         self.decay_rate = cfg.DECAY_RATE
         self.staircase = cfg.STAIRCASE
@@ -61,7 +61,7 @@ class Solver(object):
         if self.saveconfig:
             self.save_config()
 
-        self.variable_to_restore = tf.global_variables()
+        self.variable_to_restore = tf.global_variables()[:-2]
         self.variable_to_save = tf.global_variables()
         self.restorer = tf.train.Saver(self.variable_to_restore, max_to_keep=3)
         self.saver = tf.train.Saver(self.variable_to_save, max_to_keep=3)
@@ -72,8 +72,15 @@ class Solver(object):
 
         self.global_step = tf.get_variable(
             'global_step', [], initializer=tf.constant_initializer(0.0), trainable=False)
-        self.learning_rate = tf.train.exponential_decay(self.inital_learning_rate, self.global_step,
-                                                        self.decay_steps, self.decay_rate, self.staircase, name='learning_rate')
+        # self.learning_rate = tf.train.exponential_decay(self.inital_learning_rate, self.global_step,
+                                                        # self.decay_steps, self.decay_rate, self.staircase, name='learning_rate')
+        if arg.pre:
+            boundaries = [1, 50, 1000, 2000]
+            learning_rate = [0.0001, 0.001, 0.0001, 0.00001]
+        else:
+            boundaries = [1, 50, 3000, 6000]
+            learning_rate = [0.0001, 0.001, 0.0001, 0.00001]
+        self.learning_rate = tf.train.piecewise_constant(self.global_step, boundaries, learning_rate, name='learning_rate')
         #self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(
         #    self.net.total_loss, global_step=self.global_step)
         self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate).minimize(
@@ -85,9 +92,10 @@ class Solver(object):
 
         gpu_options = tf.GPUOptions()
         config = tf.ConfigProto(gpu_options=gpu_options)
+
         self.sess = tf.Session(config=config)
         self.sess.run(tf.global_variables_initializer())
-        print(self.net.confidence)
+
         if self.weight_file is not None:
             print('\n----------Restoring weights from: {}------------'.format(self.weight_file))
             self.restorer.restore(self.sess, self.weight_file)
@@ -97,7 +105,6 @@ class Solver(object):
 
     def train(self):
         self.net.evaluation_off()
-        self.variable_to_save = tf.global_variables()
         train_timer = Timer()
         load_timer = Timer()
 
@@ -187,7 +194,7 @@ class Solver(object):
         feed_dict = {self.net.input_images: images, self.net.labels: labels}
         #predicts: [batch, cell, cell, coords + classes + confidence]
         predicts = self.sess.run(self.net.logit, feed_dict=feed_dict)  # run
-        confidence = predicts[:, :, :, -1]
+        #confidence = predicts[:, :, :, -1]
         testing_error_trans = 0.0
         testing_error_angle = 0.0
         testing_error_pixel = 0.0
@@ -368,7 +375,7 @@ def main():
 
     yolo = YOLO6D_net()
     datasets = Linemod('train', arg=args.datacfg)
-    solver = Solver(yolo, datasets, arg=args.datacfg)
+    solver = Solver(yolo, datasets, arg=args)
 
     print("\n-----------------------------start training----------------------------")
     tic = time.clock()

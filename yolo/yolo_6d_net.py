@@ -50,8 +50,6 @@ class YOLO6D_net:
         self.cell_size = cfg.CELL_SIZE
         self.num_coord = cfg.NUM_COORD  ## 18: 9 points, 8 corners + 1 centroid
 
-        self.reg_l2 = tf.contrib.layers.l2_regularizer(self.WEIGHT_DECAY)
-
         self.obj_scale = cfg.CONF_OBJ_SCALE
         self.noobj_scale = cfg.CONF_NOOBJ_SCALE
         self.class_scale = cfg.CLASS_SCALE
@@ -144,7 +142,6 @@ class YOLO6D_net:
         stride = [strides, strides, strides, strides]
         weight = tf.Variable(tf.truncated_normal(weight_shape, stddev=0.1), name='weight')
         bias = tf.Variable(tf.constant(0.1, shape=bias_shape), name='biases')
-        tf.add_to_collection(tf.GraphKeys.WEIGHTS, weight)
 
         x = tf.nn.conv2d(x, weight, strides=stride, padding=pad, name=name)
         if self.Batch_Norm:
@@ -219,7 +216,7 @@ class YOLO6D_net:
             ## see paper section3.2
             ## Calculate confidence (instead of IoU like in YOLOv2)
             self.Euclid_dist = dist(predict_boxes_tran, labels_coord)
-            self.confidence = confidence_func(self.Euclid_dist)
+            self.confidence = confidence_func(self.Euclid_dist, response)
 
             object_coef = tf.constant(self.obj_scale, dtype=tf.float32)
             noobject_coef = tf.constant(self.noobj_scale, dtype=tf.float32)
@@ -235,15 +232,13 @@ class YOLO6D_net:
             ## coordinates loss
             coord_loss = tf.losses.mean_squared_error(labels_coord, predict_boxes_tran, weights=coords_coef, scope='Coord_Loss')
             ## classification loss
-            class_loss =cross_entropy(labels_classes, predict_classes, weights=class_coef)
-
-            reg_term = tf.contrib.layers.apply_regularization(self.reg_l2)
+            class_loss = cross_entropy(labels_classes, predict_classes, weights=class_coef)
 
             # tf.losses.add_loss(coord_loss)
             # tf.losses.add_loss(conf_loss)
             # tf.losses.add_loss(class_loss)
             # tf.losses.add_loss(reg_term)
-            loss = conf_loss + coord_loss + class_loss + reg_term
+            loss = conf_loss + coord_loss + class_loss
             return loss
 
 

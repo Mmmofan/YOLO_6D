@@ -70,7 +70,7 @@ def cross_entropy(logit, label, weights):
 
     return cross_entropy_loss
 
-def confidence_func(x):
+def confidence_func(x, weights):
     """
     Args:
         x: A 4-D tensor: [Batch_size, feature_size, feature_size, 18]
@@ -80,19 +80,23 @@ def confidence_func(x):
     """
     alpha = tf.constant(cfg.ALPHA, dtype=tf.float32)
     dth_in_cell_size = tf.constant(cfg.Dth, dtype=tf.float32)
-    param1 = tf.ones_like(x, dtype=tf.float32)
+    one = tf.ones_like(x, dtype=tf.float32)
+    shape = x.get_shape()
 
-    # if number in x <= dth_in_cell_size, the position in temp would be 0,
-    # otherwise would be 1
+    # if number in x <= dth_in_cell_size, the position in temp would be 1.0,
+    # otherwise(x > dth_int_cell_size) would be 0
     temp = tf.cast(x <= dth_in_cell_size, tf.float32)
+    weights = tf.tile(weights, (1, 1, 1, shape[3]))
 
-    confidence = (tf.exp(alpha * (param1 - x / dth_in_cell_size)) - param1) / (tf.exp(alpha) - param1)
+    confidence = (tf.exp(alpha * (one - x / dth_in_cell_size)) - one) / (tf.exp(alpha) - one)
 
     # if distance in x bigger than threshold, value calculated will be negtive,
     # use below to make the negtive to 0
     confidence = tf.multiply(confidence, temp)
+    confidence = tf.multiply(confidence, weights)
 
     confidence = tf.reduce_mean(confidence, 3, keep_dims=True)
+
     return confidence
 
 def dist(x1, x2):
@@ -103,9 +107,9 @@ def dist(x1, x2):
     Return:
     """
     # delta x, y
-    diff = tf.abs((x1 - x2))
+    diff = tf.abs((x1 - x2)) * 32
     # delta x-square, y-square, in pixel level
-    diff = tf.square(diff) * 32
+    diff = tf.square(diff)
     # sqrt(delta x-square + delta y-square)
     predict_x = tf.stack([diff[:, :, :, 0], diff[:, :, :, 2], diff[:, :, :, 4], diff[:, :, :, 6],
                             diff[:, :, :, 8], diff[:, :, :, 10], diff[:, :, :, 12], diff[:, :, :, 14], diff[:, :, :, 16]], 3)
@@ -114,7 +118,6 @@ def dist(x1, x2):
 
     # compute distance in pixel level
     distance = tf.sqrt(tf.add(predict_x, predict_y))
-    shape = distance.get_shape()
 
     return distance
 
