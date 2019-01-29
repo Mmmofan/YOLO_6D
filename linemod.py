@@ -5,12 +5,10 @@
 # @Email: fmo@nullmax.ai
 # ---------------------
 
-import copy
 import os
-
+import random
 import cv2
 import numpy as np
-import tensorflow as tf
 
 import yolo.config as cfg
 from utils.utils import *
@@ -35,6 +33,10 @@ class Linemod(object):
         self.image_size = cfg.IMAGE_SIZE
         self.image_width = 640   # axis x
         self.image_height = 480   # axis y
+        self.mask_path = 'LINEMOD/' + self.dataset_name + '/mask/'
+        self.mask_files = None
+        self.bg_txt = 'VOCdevkit/VOC2012/ImageSets/Layout/trainval.txt'
+        self.bg_files = None
 
         self.cell_size = cfg.CELL_SIZE
         self.boxes_per_cell = cfg.BOXES_PER_CELL
@@ -46,26 +48,35 @@ class Linemod(object):
         self.train_gt_labels = None
         self.test_gt_labels = None
         self.gt_labels = None
-        self.epoch = 0
         self.batch = 0
-        print("---------Loading dataset---------")
-        self.prepare()  # get the image files name and label files name
-        print("----Loading dataset complete-----")
+        print("\n---------------Loading dataset---------------")
+        self.prepare(self.phase)  # get the image files name and label files name
+        # print(len(self.bg_files))
+        print("----------Loading dataset complete-----------\n")
 
-    def prepare(self):
+    def prepare(self, phase):
         """
         self.imgname: A list of all training image files
         self.gt_labels: A list of all ground true labels(which elements are lists like [[1,xx,xx,...],[1,xx,xx,...]] with integer and float numbers)
         these two matched respectively
         """
-        if self.phase == 'train':
+        if phase == 'train':
             with open(self.trainlist, 'r') as f:
                 self.imgname = [x.strip() for x in f.readlines()]  # a list of trianing files
             self.gt_labels = self.load_labels() # a list of all labels with respect to imgname
-        elif self.phase == 'test':
+
+            for ro, _, fi in os.walk(self.mask_path):
+                root, __, files = ro, _, fi
+            self.mask_files = files
+
+            with open(self.bg_txt, 'r') as f:
+                self.bg_files = [x.split()[0] for x in f.readlines()]
+
+        elif phase == 'test':
             with open(self.testlist, 'r') as f:
                 self.imgname = [x.strip() for x in f.readlines()]
             self.gt_labels = self.load_labels()
+
         else:
             print('\n   Wrong phase...\n   Try again...')
 
@@ -73,8 +84,11 @@ class Linemod(object):
         images = np.zeros((self.batch_size, 416, 416, 3), np.float32)
         labels = np.zeros((self.batch_size, 13, 13, 1 + self.boxes_per_cell*9*2 + self.num_classes), np.float32)
 
+        # for idx in range(self.batch_size):
+            # images[idx] = self.image_read(self.imgname[idx + self.batch * self.batch_size], self.flipped)
+            # labels[idx] = self.label_read(self.gt_labels[idx + self.batch * self.batch_size], self.flipped)
         for idx in range(self.batch_size):
-            images[idx] = self.image_read(self.imgname[idx + self.batch * self.batch_size], self.flipped)
+            images[idx] = self.image_bg_replace(self.imgname[idx+self.batch*self.batch_size][-8:-3], self.flipped)
             labels[idx] = self.label_read(self.gt_labels[idx + self.batch * self.batch_size], self.flipped)
 
         self.batch += 1
@@ -85,7 +99,7 @@ class Linemod(object):
         labels = np.zeros((self.batch_size, 13, 13, 32), np.float32)
 
         for idx in range(self.batch_size):
-            images[idx] = self.image_read(self.imgname[idx + self.batch * self.batch_size], self.flipped)
+            images[idx] = self.image_bg_replace(self.imgname[idx+self.batch*self.batch_size][-8:-3], self.flipped)
             labels[idx] = self.label_read(self.gt_labels[idx + self.batch * self.batch_size], self.flipped)
 
         return images, labels
@@ -113,6 +127,35 @@ class Linemod(object):
             labels[0] = int(labels[0])
             gt_labels.append(labels)
         return gt_labels
+
+    def image_bg_replace(self, imgname, flipped):
+        imgname += 'png'
+        mask_path = self.mask_path + imgname
+        mask = cv2.imread(mask_path)
+        mask = cv2.resize(mask, (self.image_size, self.image_size))
+
+        rand_num = random.randint(0, 840)
+        bg_file = self.bg_files[rand_num]
+        bg_file_path = 'VOCdevkit/VOC2012/JPEGImages/' + bg_file + '.jpg'
+        bg = cv2.imread(bg_file_path)
+        bg = cv2.resize(bg, (self.image_size, self.image_size))
+
+        obj_path = 'LINEMOD/' + self.dataset_name + '/JPEGImages/' + '00' + imgname[:-3] + 'jpg'
+        obj = cv2.imread(obj_path)
+        obj = cv2.resize(obj, (self.image_size, self.image_size))
+
+        obj[mask == 0] = 0
+        bg[mask == 255] = 0
+        res = obj + bg
+
+        cv2.imwrite("replaced.jpg", res)
+        #res = cv2.cvtColor(res, cv2.COLOR_BGR2RGB).astype(np.float32)
+        res = (res / 255.0) * 2.0 - 1.0
+
+        if flipped:
+            res = cv2.flip(res, 0)
+
+        return res
 
     def image_read(self, imgname, flipped):
         image = cv2.imread(imgname)
@@ -167,7 +210,7 @@ class Linemod(object):
         response_y = int(gt_yc)
 
         # set response value to 1
-        labels[response_x, response_y, 0] = 1
+        labels[response_x, response_y, 0] = 1.0
 
         # set coodinates value
         for i in range(1, 19, 1):
@@ -180,3 +223,4 @@ class Linemod(object):
         labels[response_x, response_y, 19 + gt_label] = 1
 
         return labels
+

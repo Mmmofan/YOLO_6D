@@ -10,9 +10,8 @@ from __future__ import print_function
 
 import argparse
 import datetime
+import time
 import os
-import sys
-import shutil
 
 import numpy as np
 import tensorflow as tf
@@ -44,27 +43,24 @@ class Solver(object):
         self.testing_errors_angle = []
         self.testing_errors_pixel = []
         self.testing_accuracies = []
-        self.epoch = 1
 
         self.saveconfig = False
         self.net = net
         self.data = data
         self.batch_size = cfg.BATCH_SIZE
+        self.epoch = cfg.EPOCH
         self.weight_file = cfg.WEIGHTS_FILE  # data/weights/
         self.max_iter = int(len(data.imgname) / self.batch_size)
-        self.inital_learning_rate = cfg.LEARNING_RATE  # 0.0001
+        self.inital_learning_rate = cfg.LEARNING_RATE  # 0.001
         self.decay_steps = cfg.DECAY_STEP
         self.decay_rate = cfg.DECAY_RATE
         self.staircase = cfg.STAIRCASE
         self.summary_iter = cfg.SUMMARY_ITER
         self.save_iter = cfg.SAVE_ITER
-        self.output_dir = os.path.join(cfg.OUTPUT_DIR, datetime.datetime.now().strftime('%Y_%m_%d_%H_%M'))
-        if not os.path.exists(self.output_dir):
-            os.makedirs(self.output_dir)
+        self.output_dir = cfg.OUTPUT_DIR
         if self.saveconfig:
             self.save_config()
 
-        #self.options = tf.get_default_graph().get_operations()
         self.variable_to_restore = tf.global_variables()[:-2]
         self.variable_to_save = tf.global_variables()
         self.restorer = tf.train.Saver(self.variable_to_restore, max_to_keep=3)
@@ -76,101 +72,106 @@ class Solver(object):
 
         self.global_step = tf.get_variable(
             'global_step', [], initializer=tf.constant_initializer(0.0), trainable=False)
-        self.learning_rate = tf.train.exponential_decay(self.inital_learning_rate, self.global_step,
-                                                        self.decay_steps, self.decay_rate, self.staircase, name='learning_rate')
+        # self.learning_rate = tf.train.exponential_decay(self.inital_learning_rate, self.global_step,
+                                                        # self.decay_steps, self.decay_rate, self.staircase, name='learning_rate')
+        if arg.pre:
+            boundaries = [1, 50, 1000, 2000]
+            learning_rate = [0.0001, 0.001, 0.0001, 0.00001]
+        else:
+            boundaries = [1, 50, 3000, 6000]
+            learning_rate = [0.0001, 0.001, 0.0001, 0.00001]
+        self.learning_rate = tf.train.piecewise_constant(self.global_step, boundaries, learning_rate, name='learning_rate')
         #self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(
         #    self.net.total_loss, global_step=self.global_step)
         self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate).minimize(
             self.net.total_loss, global_step=self.global_step)
-        self.ema = tf.train.ExponentialMovingAverage(decay=0.9999)
+        self.ema = tf.train.ExponentialMovingAverage(decay=0.999)
         self.averages_op = self.ema.apply(tf.trainable_variables())
         with tf.control_dependencies([self.optimizer]):
             self.train_op = tf.group(self.averages_op)
 
         gpu_options = tf.GPUOptions()
         config = tf.ConfigProto(gpu_options=gpu_options)
+
         self.sess = tf.Session(config=config)
         self.sess.run(tf.global_variables_initializer())
+
         if self.weight_file is not None:
-            print('----------Restoring weights from: {}------------'.format(self.weight_file))
-            #self.restorer.restore(self.sess, tf.train.latest_checkpoint(r'./data/weights/'))
+            print('\n----------Restoring weights from: {}------------'.format(self.weight_file))
             self.restorer.restore(self.sess, self.weight_file)
 
         self.writer.add_graph(self.sess.graph)
 
 
     def train(self):
-
-        self.variable_to_save = tf.global_variables()
+        self.net.evaluation_off()
         train_timer = Timer()
         load_timer = Timer()
 
-        for step in range(1, self.max_iter):
-            load_timer.tic()
-            images, labels = self.data.next_batches()
-            load_timer.toc()
+        epoch = 0
+        while epoch <= self.epoch:
+            for step in range(0, self.max_iter-1):
+                load_timer.tic()
+                images, labels = self.data.next_batches()
+                load_timer.toc()
 
-            feed_dict = {self.net.input_images: images, self.net.labels: labels}
+                feed_dict = {self.net.input_images: images, self.net.labels: labels}
 
-            if step % self.summary_iter == 0:
-                if step % (self.summary_iter * 4) == 0:
-                    train_timer.tic()
-                    summary_str, loss, _ = self.sess.run(
-                        [self.summary_op, self.net.total_loss, self.train_op],
-                        feed_dict=feed_dict
-                    )
-                    train_timer.toc()
+                if step % self.summary_iter == 0:
+                    if step % (self.summary_iter * 4) == 0:
+                        train_timer.tic()
+                        summary_str, loss, _ = self.sess.run(
+                            [self.summary_op, self.net.total_loss, self.train_op],
+                            feed_dict=feed_dict
+                        )
+                        train_timer.toc()
 
-                    log_str = ('\n   Time:{}, Epoch:{}, Step:{}, Learning rate:{},\n'
-                        '   Loss: {:5.3f},\n   Speed: {:.3f}s/iter,'
-                        ' Load: {:.3f}s/iter, Remain: {}').format(
-                        datetime.datetime.now().strftime('%m/%d %H:%M:%S'),
-                        self.epoch,
-                        int(step),
-                        round(self.learning_rate.eval(session=self.sess), 6),
-                        loss,
-                        train_timer.average_time,
-                        load_timer.average_time,
-                        train_timer.remain(step, self.max_iter))
-                    print(log_str)
+                        log_str = ('\n   {}, Epoch:{}, Step:{}, Learning rate:{},\n'
+                            '   Loss: {:5.3f},\n   Speed: {:.3f}s/iter,'
+                            ' Load: {:.3f}s/iter, Remain: {}').format(
+                            datetime.datetime.now().strftime('%m/%d %H:%M:%S'),
+                            epoch,
+                            int(step),
+                            round(self.learning_rate.eval(session=self.sess), 6),
+                            loss,
+                            train_timer.average_time,
+                            load_timer.average_time,
+                            train_timer.remain(step, self.max_iter))
+                        print("==================================================================")
+                        print(log_str)
 
-                    # test
-                    self.test()
-                    #print('\nsave training stats to %s/costs.npz' % (self.backupdir))
-                    #np.savez(os.path.join(self.backupdir, "costs.npz"),
-                    #        training_iters=self.global_step,
-                    #        training_losses=self.net.total_loss,
-                    #        testing_iters=self.global_step,
-                    #        testing_accuracies=self.testing_accuracies,
-                    #        testing_errors_pixel=self.testing_errors_pixel,
-                    #        testing_errors_angle=self.testing_errors_angle)
-                    if self.testing_accuracies[-1] > self.best_acc:
-                        self.best_acc = self.testing_accuracies[-1]
-                        print('   best model so far!')
-                        print('   Save weights to %s/yolo_6d.ckpt' % (self.output_dir))
-                        self.saver.save(self.sess, '%s/yolo_6d.ckpt' % (self.output_dir))
-                    self.epoch += 1
+                        # test
+                        self.test()
+
+                        if self.testing_accuracies[-1] > self.best_acc:
+                            self.best_acc = self.testing_accuracies[-1]
+                            print('   best model so far!')
+                            print('   Save weights to %s/yolo_6d.ckpt' % (self.output_dir))
+                            self.saver.save(self.sess, '%s/yolo_6d.ckpt' % (self.output_dir), global_step=self.global_step)
+
+                    else:
+                        train_timer.tic()
+                        summary_str, _ = self.sess.run(
+                            [self.summary_op, self.train_op],
+                            feed_dict=feed_dict)
+                        train_timer.toc()
+
+                    self.writer.add_summary(summary_str, step)
 
                 else:
                     train_timer.tic()
-                    summary_str, _ = self.sess.run(
-                        [self.summary_op, self.train_op],
-                        feed_dict=feed_dict)
+                    self.sess.run(self.train_op, feed_dict=feed_dict)
                     train_timer.toc()
 
-                self.writer.add_summary(summary_str, step)
-
-            else:
-                train_timer.tic()
-                self.sess.run(self.train_op, feed_dict=feed_dict)
-                train_timer.toc()
-
-            if step % self.save_iter == 0:
-                datetime.datetime.now().strftime('%m/%d %H:%M:%S')
-                print('   Save checkpoint file to: {}'.format(
-                    self.weight_file))
-                self.saver.save(self.sess, self.weight_file,
-                                global_step=self.global_step)
+                if step % self.save_iter == 0:
+                    datetime.datetime.now().strftime('%m/%d %H:%M:%S')
+                    print('   Save checkpoint file to: {}'.format(
+                        self.weight_file))
+                    print("==================================================================")
+                    self.saver.save(self.sess, self.weight_file,
+                                    global_step=self.global_step)
+            epoch += 1
+            self.data.batch = 0
 
         print('\n   Save final checkpoint file to: {}'.format(self.weight_file))
         self.saver.save(self.sess, self.weight_file, global_step=self.global_step)
@@ -192,8 +193,8 @@ class Solver(object):
 
         feed_dict = {self.net.input_images: images, self.net.labels: labels}
         #predicts: [batch, cell, cell, coords + classes + confidence]
-        predicts, confidence_score = self.sess.run([self.net.logit, self.net.conf_score], feed_dict=feed_dict)  # run
-
+        predicts = self.sess.run(self.net.logit, feed_dict=feed_dict)  # run
+        #confidence = predicts[:, :, :, -1]
         testing_error_trans = 0.0
         testing_error_angle = 0.0
         testing_error_pixel = 0.0
@@ -204,12 +205,13 @@ class Solver(object):
         errs_angle = []
         errs_corner2D = []
 
-        all_boxes = []
+        #all_boxes = []
         #Iterate throught test examples
         for batch_idx in range(cfg.BATCH_SIZE):
             test_timer.tic()
-            conf_sco = confidence_score[batch_idx]
+            #conf_sco = confidence_score[batch_idx]
             logit = predicts[batch_idx] # 3-D
+            logit = logit * 10.0
             truth = truths[batch_idx]
             #num_gts = truth[0]
 
@@ -350,7 +352,7 @@ def update_config_paths(data_dir, weights_file):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--datacfg', default='cfg/ape.data', type=str)
-    parser.add_argument('--weights', default="YOLO_6D.ckpt", type=str)
+    parser.add_argument('--weights', default="yolo_6d.ckpt", type=str)
     parser.add_argument('--pre', default=False, type=bool)
     parser.add_argument('--data_dir', default="data", type=str)
     parser.add_argument('--threshold', default=0.2, type=float)
@@ -362,6 +364,7 @@ def main():
         print('No datacfg file specified')
 
     if args.pre:
+        print("Pre-training... ")
         cfg.CONF_OBJ_SCALE = 0.0
         cfg.CONF_NOOBJ_SCALE = 0.0
 
@@ -371,16 +374,15 @@ def main():
     os.environ['CUDA_VISABLE_DEVICES'] = args.gpu
 
     yolo = YOLO6D_net()
-
-    #datasets = ImageNet(pre=args.pre)
-    #datasets = Pascal_voc(pre=args.pre)
     datasets = Linemod('train', arg=args.datacfg)
+    solver = Solver(yolo, datasets, arg=args)
 
-    solver = Solver(yolo, datasets, arg=args.datacfg)
-    print("-----------------------------start training----------------------------")
+    print("\n-----------------------------start training----------------------------")
+    tic = time.clock()
     solver.train()
-    print("------------------------------training end-----------------------------")
-    #shutil.copy2('%s/model.weights' % (solver.backupdir), '%s/model_backup.weights' % (solver.backupdir))
+    toc = time.clock()
+    print("All training time: {}h".format((toc - tic) / 3600.0))
+    print("------------------------------training end-----------------------------\n")
 
 if __name__ == "__main__":
 

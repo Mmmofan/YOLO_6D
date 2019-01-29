@@ -54,7 +54,23 @@ def softmax(X, theta = 1.0, axis = None):
     if len(X.shape) == 1: p = p.flatten()
     return p
 
-def confidence_func(x):
+def cross_entropy(logit, label, weights):
+    """
+    logit: output [B, C, C, classes]
+    label: ground truth [B, C, C, classes]
+    weigth: [B, C, C, 1]
+    """
+    logit = tf.clip_by_value(logit, 1e-10, 1.0)
+    logit_shape = logit.get_shape()
+    label_shape = label.get_shape()
+    assert(logit_shape == label_shape)
+    weight = tf.tile(weights, [1, 1, 1, logit_shape[-1]])
+
+    cross_entropy_loss = tf.reduce_sum(tf.multiply(tf.multiply(label, tf.log(logit)), weight))
+
+    return cross_entropy_loss
+
+def confidence_func(x, weights):
     """
     Args:
         x: A 4-D tensor: [Batch_size, feature_size, feature_size, 18]
@@ -63,15 +79,24 @@ def confidence_func(x):
         A 4-D tensor: [Batch_Size, feature_size, feature_size, 18]
     """
     alpha = tf.constant(cfg.ALPHA, dtype=tf.float32)
-    dth_in_cell_size = tf.constant(cfg.Dth * cfg.CELL_SIZE / 416, dtype=tf.float32)
-    param1 = tf.ones_like(x, dtype=tf.float32)
+    dth_in_cell_size = tf.constant(cfg.Dth, dtype=tf.float32)
+    one = tf.ones_like(x, dtype=tf.float32)
+    shape = x.get_shape()
 
+    # if number in x <= dth_in_cell_size, the position in temp would be 1.0,
+    # otherwise(x > dth_int_cell_size) would be 0
     temp = tf.cast(x <= dth_in_cell_size, tf.float32)
-    confidence = (tf.exp(alpha * (param1 - x / dth_in_cell_size)) - param1) / (tf.exp(alpha) - param1)
+    weights = tf.tile(weights, (1, 1, 1, shape[3]))
+
+    confidence = (tf.exp(alpha * (one - x / dth_in_cell_size)) - one) / (tf.exp(alpha) - one)
+
+    # if distance in x bigger than threshold, value calculated will be negtive,
+    # use below to make the negtive to 0
     confidence = tf.multiply(confidence, temp)
-    # if distance in x bigger than threshold, value calculated will be negtive, use above to make the negtive to 0
+    confidence = tf.multiply(confidence, weights)
 
     confidence = tf.reduce_mean(confidence, 3, keep_dims=True)
+
     return confidence
 
 def dist(x1, x2):
@@ -81,63 +106,20 @@ def dist(x1, x2):
         x2: 4-D tensor, [batch_size, cell_size, cell_size, 18]
     Return:
     """
-    predict_x = tf.stack([x1[:, :, :, 0], x1[:, :, :, 2], x1[:, :, :, 4], x1[:, :, :, 6],
-                            x1[:, :, :, 8], x1[:, :, :, 10], x1[:, :, :, 12], x1[:, :, :, 14], x1[:, :, :, 16]], 3)
-    predict_y = tf.stack([x1[:, :, :, 1], x1[:, :, :, 3], x1[:, :, :, 5], x1[:, :, :, 7],
-                            x1[:, :, :, 9], x1[:, :, :, 11], x1[:, :, :, 13], x1[:, :, :, 15], x1[:, :, :, 17]], 3)
-    gt_x = tf.stack([x2[:, :, :, 0], x2[:, :, :, 2], x2[:, :, :, 4], x2[:, :, :, 6],
-                        x2[:, :, :, 8], x2[:, :, :, 10], x2[:, :, :, 12], x2[:, :, :, 14], x2[:, :, :, 16]], 3)
-    gt_y = tf.stack([x2[:, :, :, 1], x2[:, :, :, 3], x2[:, :, :, 5], x2[:, :, :, 7],
-                        x2[:, :, :, 9], x2[:, :, :, 11], x2[:, :, :, 13], x2[:, :, :, 15], x2[:, :, :, 17]], 3)
-    distance = tf.sqrt(tf.add(tf.square(predict_x - gt_x), tf.square(predict_y - gt_y)))
-    ### dist: 4-D tensor [batch_size, cell_size, cell_size, 9]
+    # delta x, y
+    diff = tf.abs((x1 - x2)) * 32
+    # delta x-square, y-square, in pixel level
+    diff = tf.square(diff)
+    # sqrt(delta x-square + delta y-square)
+    predict_x = tf.stack([diff[:, :, :, 0], diff[:, :, :, 2], diff[:, :, :, 4], diff[:, :, :, 6],
+                            diff[:, :, :, 8], diff[:, :, :, 10], diff[:, :, :, 12], diff[:, :, :, 14], diff[:, :, :, 16]], 3)
+    predict_y = tf.stack([diff[:, :, :, 1], diff[:, :, :, 3], diff[:, :, :, 5], diff[:, :, :, 7],
+                            diff[:, :, :, 9], diff[:, :, :, 11], diff[:, :, :, 13], diff[:, :, :, 15], diff[:, :, :, 17]], 3)
+
+    # compute distance in pixel level
+    distance = tf.sqrt(tf.add(predict_x, predict_y))
+
     return distance
-
-def preprocess_image(images, image_size=(416, 416)):
-    """
-    Preprocess images to make the type, size and dimensions correct
-    """
-    # copy the images
-    image_cp = np.copy(images).astype(np.float32)
-    #resize images
-    image_rgb = cv2.cvtColor(image_cp, cv2.COLOR_BGR2RGB)
-    image_resized = cv2.resize(image_rgb, image_size)
-    #normalize
-    image_normalize = image_resized.astype(np.float32) / 255.0
-    #add one dimension (batch)
-    image_expanded = np.expand_dims(image_normalize, axis=0)
-
-    return image_expanded
-
-def postprocess(ouput_tensor, image_shape=(416, 416), threshold=cfg.CONF_THRESHOLD):
-    """
-    Args:
-        output_tensor: computed by net of shape [batch, cell_size, cell_size, 19+num_class]
-        trans to Numpy array first!
-    Returns:
-        tensors which have coords in real images
-    """
-    coordinates = ouput_tensor[:, :, :, :18]
-    class_prob = ouput_tensor[:, :, :, 18:-1]
-    confidence = ouput_tensor[:, :, :, -1]
-
-    # Restore the coordinates fit real images
-    off_set = np.transpose(np.reshape(np.array(
-                                [np.arange(cfg.CELL_SIZE)] * cfg.CELL_SIZE * 18 * cfg.BOXES_PER_CELL),
-                                (18, cfg.CELL_SIZE, cfg.CELL_SIZE)),
-                                (1, 2, 0)).astype(np.float32)
-    off_set = np.reshape(off_set, [1, cfg.CELL_SIZE, cfg.CELL_SIZE, 18 * cfg.BOXES_PER_CELL])
-    off_set = np.tile(off_set, [cfg.BATCH_SIZE, 1, 1, 1])
-    ## off_set shape : [Batch_Size, cell_size, cell_size, 18 * boxes_per_cell]
-    off_set_centroids = off_set[:, :, :, :2]
-    off_set_corners = off_set[:, :, :, 2:]
-    predict_boxes_tran = np.concatenate([sigmoid_func(coordinates[:, :, :, :2]) + off_set_centroids,
-                                        coordinates[:, :, :, 2:] + off_set_corners], 3)
-    predict_boxes = np.multiply(predict_boxes_tran, float(cfg.CELL_SIZE))  ## Coordinates in real images
-
-    # Cut the box, assert the boxes' bounding less than 416
-    predict_boxes[predict_boxes > 416] = 416
-    predict_boxes[predict_boxes < 0] = 0
 
 
 def confidence_thresh(cscs, predicts, threshold=cfg.CONF_THRESHOLD):
@@ -195,11 +177,6 @@ def nms33(input_tensor, cscs):
     out_tensor = np.multiply(res, input_tensor)
     return out_tensor
 
-def compute_average(orig_tensor, cscs, out_tensor):
-    """
-    Unfinish
-    """
-    return out_tensor
 
 def get_region_boxes(output, num_classes):
     """

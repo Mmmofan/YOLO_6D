@@ -24,28 +24,6 @@ train:
 
 class YOLO6D_net:
 
-    Batch_Size = cfg.BATCH_SIZE
-    WEIGHT_DECAY = cfg.WEIGHT_DECAY
-    MAX_PADDING = cfg.MAX_PAD
-    EPSILON = cfg.EPSILON
-    learning_rate = cfg.LEARNING_RATE
-    optimizer = None
-    total_loss = None
-    disp = cfg.DISP
-    param_num = 0
-    boxes_per_cell = cfg.BOXES_PER_CELL
-    image_size = cfg.IMAGE_SIZE
-
-    num_class = cfg.NUM_CLASSES
-    Batch_Norm = cfg.BATCH_NORM
-    ALPHA = cfg.ALPHA
-    cell_size = cfg.CELL_SIZE
-    num_coord = cfg.NUM_COORD  ## 18: 9 points, 8 corners + 1 centroid
-
-    obj_scale = cfg.CONF_OBJ_SCALE
-    noobj_scale = cfg.CONF_NOOBJ_SCALE
-    class_scale = cfg.CLASS_SCALE
-    coord_scale = cfg.COORD_SCALE
 
     def __init__(self, is_training=True):
         """
@@ -54,6 +32,29 @@ class YOLO6D_net:
             self.input_images ==> self.logit
         Input labels: [batch * 13 * 13 * 20 + num_classes]
         """
+        self.Batch_Size = cfg.BATCH_SIZE
+        self.WEIGHT_DECAY = cfg.WEIGHT_DECAY
+        self.MAX_PADDING = cfg.MAX_PAD
+        self.EPSILON = cfg.EPSILON
+        self.learning_rate = cfg.LEARNING_RATE
+        self.optimizer = None
+        self.total_loss = None
+        self.disp = cfg.DISP
+        self.param_num = 0
+        self.boxes_per_cell = cfg.BOXES_PER_CELL
+        self.image_size = cfg.IMAGE_SIZE
+
+        self.num_class = cfg.NUM_CLASSES
+        self.Batch_Norm = cfg.BATCH_NORM
+        self.ALPHA = cfg.ALPHA
+        self.cell_size = cfg.CELL_SIZE
+        self.num_coord = cfg.NUM_COORD  ## 18: 9 points, 8 corners + 1 centroid
+
+        self.obj_scale = cfg.CONF_OBJ_SCALE
+        self.noobj_scale = cfg.CONF_NOOBJ_SCALE
+        self.class_scale = cfg.CLASS_SCALE
+        self.coord_scale = cfg.COORD_SCALE
+
         self.boundry_1 = 9 * 2 * self.boxes_per_cell   ## Seperate coordinates
         self.boundry_2 = self.num_class
 
@@ -68,30 +69,19 @@ class YOLO6D_net:
 
         self.logit = self._build_net(self.input_images)
         self.confidence = None
-
-        #predict_coord = tf.reshape(self.logit[:, :, :, :self.boundry_1],   [self.Batch_Size, self.cell_size, self.cell_size, self.num_coord])
-        #labels_coord = tf.reshape(self.labels[:, :, :, 1:self.boundry_1+1], [self.Batch_Size, self.cell_size, self.cell_size, self.num_coord])
-
-        #predict_centroids = predict_coord[:, :, :, :2*self.boxes_per_cell]
-        #predict_corners = predict_coord[:, :, :, 2*self.boxes_per_cell:]
-        #predict_boxes_tran = tf.concat([tf.nn.sigmoid(predict_centroids), predict_corners], 3)
-
-        #Euclid_dist = dist(predict_boxes_tran, labels_coord)
-        #self.confidence = confidence_func(Euclid_dist)
+        self.Euclid_dist = None
 
         if is_training:
-            print('   compute loss   ')
-            self.loss_layer(self.logit, self.labels)
-            self.total_loss = tf.losses.get_total_loss()
+            self.total_loss = self.loss_layer(self.logit, self.labels)
             tf.summary.scalar('Total loss', self.total_loss)
 
         #self.conf_value = tf.reshape(self.logit[:, :, :, -1], [-1, self.cell_size, self.cell_size, 1])
-        self.conf_score = self.confidence_score(self.logit, self.confidence)
+        # self.conf_score = self.confidence_score(self.logit, self.confidence)
 
 
     def _build_net(self, input):
         if self.disp:
-            print("--------Building network---------")
+            print("\n--------Building network---------")
         self.Batch_Norm = True
         x = self.conv(input, 3, 1, 32, 'leaky', name='0_conv')
         x = self.max_pool_layer(x, name='1_pool')
@@ -135,32 +125,25 @@ class YOLO6D_net:
         x = self.conv(x, 1, 1, 18 + 1 + self.num_class, 'linear', name='27_conv') ## 9 points 1 confidence C classes
 
         if self.disp:
-            print("----Building network complete----")
+            print("----Building network complete----\n")
 
         return x
+
+# ======================== Net definition ==================================
 
     def conv(self, x, kernel_size, strides, filters, activation, name, pad='SAME'):
         """
-        Conv ==>Batch_Norm==>Activation
+        Conv ==> Batch_Norm ==> Bias
         """
-        #with tf.variable_scope('Net'):
-        x = self.conv_layer(x, kernel_size, strides, filters, name=name, pad='SAME')
-        if self.Batch_Norm:
-            x = self.activation(x, activation)
-        return x
-
-    def conv_layer(self, x, kernel_size, stride, filters, name, pad='SAME'):
         x_shape = x.get_shape()
         x_channels = x_shape[3].value
         weight_shape = [kernel_size, kernel_size, x_channels, filters]
         bias_shape = [filters]
-        strides = [stride, stride, stride, stride]
+        stride = [strides, strides, strides, strides]
         weight = tf.Variable(tf.truncated_normal(weight_shape, stddev=0.1), name='weight')
         bias = tf.Variable(tf.constant(0.1, shape=bias_shape), name='biases')
-        #weight = self._get_variable("weight", weight_shape, initializer=tf.truncated_normal_initializer(stddev=0.1))
-        #bias = self._get_variable("bias", bias_shape, initializer=tf.constant_initializer(0.0))
-        y = tf.nn.conv2d(x, weight, strides=strides, padding=pad, name=name)
-        y = tf.add(y, bias)
+
+        x = tf.nn.conv2d(x, weight, strides=stride, padding=pad, name=name)
         if self.Batch_Norm:
             depth = filters
             scale = tf.Variable(tf.ones([depth, ], dtype='float32'), name='scale')
@@ -168,15 +151,22 @@ class YOLO6D_net:
             mean = tf.Variable(tf.ones([depth, ], dtype='float32'), name='rolling_mean')
             variance = tf.Variable(tf.ones([depth, ], dtype='float32'), name='rolling_variance')
 
-            y = tf.nn.batch_normalization(y, mean, variance, shift, scale, self.EPSILON)
-        
-        return y
+            x = tf.nn.batch_normalization(x, mean, variance, shift, scale, self.EPSILON)
+
+        x = tf.add(x, bias)
+
+        if self.Batch_Norm:
+            x = self.activation(x, activation)
+
+        return x
 
     def max_pool_layer(self, x, name):
         return tf.nn.max_pool(x, ksize=[1,2,2,1], strides=[1,2,2,1], padding=self.MAX_PADDING, name=name)
 
     def activation(self, x, activation_func, name='activation_func'):
         if activation_func=='leaky':
+            return tf.nn.leaky_relu(x, alpha=0.1, name='leaky')
+        elif activation_func=='relu':
             return tf.nn.relu(x, name='relu')
         else:
             return x
@@ -195,21 +185,7 @@ class YOLO6D_net:
         x = tf.reshape(x, shape=[-1, Ws, Hs, Cs])
         return x
 
-    def _get_variable(self, name, shape, initializer):
-        """
-        创建一个函数获取变量，方便进行正则化处理等
-        """
-        param = 1
-        for i in range(0, len(shape)):
-            param *= shape[i]
-        self.param_num += param
-
-        if self.WEIGHT_DECAY > 0:
-            regularizer = tf.contrib.layers.l2_regularizer(self.WEIGHT_DECAY)
-        else:
-            regularizer = None
-
-        return tf.get_variable(name, shape=shape, regularizer=regularizer, initializer=initializer)
+# ======================= Net definition end ===============================
 
     def loss_layer(self, predicts, labels, scope='Loss_layer'):
         """
@@ -236,26 +212,35 @@ class YOLO6D_net:
             predict_boxes_tran = tf.concat([tf.nn.sigmoid(predict_centroids), predict_corners], 3)
             ## predicts coordinates with respect to input images, [Batch_Size, cell_size, cell_size, 18]
             ## output is offset with respect to centroid, so has to add the centroid coord(top-left corners of every cell)
-            ## see paper section3.2
 
+            ## see paper section3.2
             ## Calculate confidence (instead of IoU like in YOLOv2)
-            Euclid_dist = dist(predict_boxes_tran, labels_coord)
-            self.confidence = confidence_func(Euclid_dist)
+            self.Euclid_dist = dist(predict_boxes_tran, labels_coord)
+            self.confidence = confidence_func(self.Euclid_dist, response)
 
             object_coef = tf.constant(self.obj_scale, dtype=tf.float32)
             noobject_coef = tf.constant(self.noobj_scale, dtype=tf.float32)
-            conf_mask = tf.ones_like(response) * noobject_coef + response * object_coef # [batch. cell, cell, 1] with object:5.0, no object:0.1
+            conf_coef = tf.ones_like(response) * noobject_coef + response * object_coef # [batch. cell, cell, 1] with object:5.0, no object:0.1
 
-            ## coordinates loss
-            coord_loss = tf.losses.mean_squared_error(labels_coord, predict_boxes_tran, weights=response, scope='Coord_Loss')
+            coords_coef = tf.tile(response * self.coord_scale, [1, 1, 1, self.num_coord])
+
+            class_coef = response * self.class_scale
+
+
             ## confidence loss, the loss between output confidence value and compute confidence
-            conf_loss = tf.losses.mean_squared_error(self.confidence, predict_conf, weights=conf_mask, scope='Conf_Loss')
+            conf_loss = tf.losses.mean_squared_error(self.confidence, predict_conf, weights=conf_coef, scope='Conf_Loss')
+            ## coordinates loss
+            coord_loss = tf.losses.mean_squared_error(labels_coord, predict_boxes_tran, weights=coords_coef, scope='Coord_Loss')
             ## classification loss
-            class_loss = tf.losses.softmax_cross_entropy(labels_classes, predict_classes, weights=self.class_scale, scope='Class_Loss')
+            class_loss = cross_entropy(labels_classes, predict_classes, weights=class_coef)
 
-            tf.losses.add_loss(coord_loss)
-            tf.losses.add_loss(conf_loss)
-            tf.losses.add_loss(class_loss)
+            # tf.losses.add_loss(coord_loss)
+            # tf.losses.add_loss(conf_loss)
+            # tf.losses.add_loss(class_loss)
+            # tf.losses.add_loss(reg_term)
+            loss = conf_loss + coord_loss + class_loss
+            return loss
+
 
     def confidence_score(self, predicts, confidence):
         """
@@ -279,3 +264,8 @@ class YOLO6D_net:
         """
         self.is_training = False
         self.Batch_Norm = False
+
+    def evaluation_off(self):
+        self.is_training = True
+        self.Batch_Norm = True
+
