@@ -60,7 +60,7 @@ def cross_entropy(logit, label, weights):
     label: ground truth [B, C, C, classes]
     weigth: [B, C, C, 1]
     """
-    logit = tf.clip_by_value(logit, 1e-10, 1.0)
+    logit = softmax(logit, axis=3)
     logit_shape = logit.get_shape()
     label_shape = label.get_shape()
     assert(logit_shape == label_shape)

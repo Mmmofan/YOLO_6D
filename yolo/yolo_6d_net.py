@@ -140,8 +140,8 @@ class YOLO6D_net:
         weight_shape = [kernel_size, kernel_size, x_channels, filters]
         bias_shape = [filters]
         stride = [strides, strides, strides, strides]
-        weight = tf.Variable(tf.truncated_normal(weight_shape, stddev=0.1), name='weight')
-        bias = tf.Variable(tf.constant(0.1, shape=bias_shape), name='biases')
+        weight = tf.Variable(tf.truncated_normal(weight_shape, stddev=0.1), name='weight') / (self.cell_size * self.cell_size)
+        bias = tf.Variable(tf.constant(0.1, shape=bias_shape), name='biases') / (self.cell_size * self.cell_size)
 
         x = tf.nn.conv2d(x, weight, strides=stride, padding=pad, name=name)
         if self.Batch_Norm:
@@ -210,6 +210,8 @@ class YOLO6D_net:
             labels_classes = tf.reshape(labels[:, :, :, self.boundry_1+1:], [self.Batch_Size, self.cell_size, self.cell_size, self.num_class])
 
             predict_boxes_tran = tf.concat([tf.nn.sigmoid(predict_centroids), predict_corners], 3)
+            predict_boxes_valid = tf.multiply(predict_boxes_tran, tf.tile(response, [1, 1, 1, self.num_coord]))
+            predict_class_valid = tf.multiply(predict_classes, tf.tile(response, [1, 1, 1, self.num_class]))
             ## predicts coordinates with respect to input images, [Batch_Size, cell_size, cell_size, 18]
             ## output is offset with respect to centroid, so has to add the centroid coord(top-left corners of every cell)
 
@@ -222,17 +224,18 @@ class YOLO6D_net:
             noobject_coef = tf.constant(self.noobj_scale, dtype=tf.float32)
             conf_coef = tf.ones_like(response) * noobject_coef + response * object_coef # [batch. cell, cell, 1] with object:5.0, no object:0.1
 
-            coords_coef = tf.tile(response * self.coord_scale, [1, 1, 1, self.num_coord])
+            # coords_coef = tf.tile(response * self.coord_scale, [1, 1, 1, self.num_coord])
 
-            class_coef = response * self.class_scale
+            # class_coef = response * self.class_scale
 
 
             ## confidence loss, the loss between output confidence value and compute confidence
             conf_loss = tf.losses.mean_squared_error(self.confidence, predict_conf, weights=conf_coef, scope='Conf_Loss')
             ## coordinates loss
-            coord_loss = tf.losses.mean_squared_error(labels_coord, predict_boxes_tran, weights=coords_coef, scope='Coord_Loss')
+            coord_loss = tf.losses.mean_squared_error(labels_coord, predict_boxes_valid, weights=self.coord_scale, scope='Coord_Loss')
             ## classification loss
-            class_loss = cross_entropy(labels_classes, predict_classes, weights=class_coef)
+            # class_loss = cross_entropy(labels_classes, predict_classes, weights=class_coef)
+            class_loss = tf.losses.softmax_cross_entropy(labels_classes, predict_class_valid, weights=self.class_scale)
 
             # tf.losses.add_loss(coord_loss)
             # tf.losses.add_loss(conf_loss)

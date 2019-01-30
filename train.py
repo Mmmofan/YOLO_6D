@@ -75,13 +75,14 @@ class Solver(object):
                                                         # self.decay_steps, self.decay_rate, self.staircase, name='learning_rate')
         if arg.pre:
             boundaries = [1, 50, 1000, 2000]
-            learning_rate = [0.001, 0.0001, 0.001, 0.0001, 0.00001]
+            learning_rate = [0.00001, 0.0001, 0.001, 0.0001, 0.00001]
         else:
             boundaries = [1, 50, 3000, 6000]
-            learning_rate = [0.001, 0.0001, 0.001, 0.0001, 0.00001]
+            learning_rate = [0.00001, 0.0001, 0.001, 0.0001, 0.00001]
+
         self.learning_rate = tf.train.piecewise_constant(self.global_step, boundaries, learning_rate, name='learning_rate')
-        #self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(
-        #    self.net.total_loss, global_step=self.global_step)
+        # self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(
+           # self.net.total_loss, global_step=self.global_step)
         self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate).minimize(
             self.net.total_loss, global_step=self.global_step)
         self.ema = tf.train.ExponentialMovingAverage(decay=0.999)
@@ -140,13 +141,13 @@ class Solver(object):
                         print(log_str)
 
                         # test
-                        self.test()
+                        # self.test()
 
-                        if self.testing_accuracies[-1] > self.best_acc:
-                            self.best_acc = self.testing_accuracies[-1]
-                            print('   best model so far!')
-                            print('   Save weights to %s/yolo_6d.ckpt' % (self.output_dir))
-                            self.saver.save(self.sess, '%s/yolo_6d.ckpt' % (self.output_dir), global_step=self.global_step)
+                        # if self.testing_accuracies[-1] > self.best_acc:
+                            # self.best_acc = self.testing_accuracies[-1]
+                            # print('   best model so far!')
+                            # print('   Save weights to %s/yolo_6d.ckpt' % (self.output_dir))
+                            # self.saver.save(self.sess, '%s/yolo_6d.ckpt' % (self.output_dir), global_step=self.global_step)
 
                     else:
                         train_timer.tic()
