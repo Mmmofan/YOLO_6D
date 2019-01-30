@@ -220,7 +220,7 @@ class Linemod(object):
                 labels[response_x, response_y, i] = coords[i - 1] - response_y
 
         # set label
-        labels[response_x, response_y, 19 + gt_label] = 1
+        labels[response_x, response_y, 19 + int(gt_label)] = 1
 
         return labels
 
