@@ -372,9 +372,7 @@ def main():
 
     yolo = YOLO6D_net()
     datasets = Linemod('train', arg=args.datacfg)
-    tfrecords = 'data/train.tfrecords'
-    # solver = Solver(yolo, datasets, arg=args)
-    solver = Solver(yolo, datasets, tfrecords, arg=args)
+    solver = Solver(yolo, datasets, arg=args)
 
     print("\n-----------------------------start training----------------------------")
     tic = time.clock()
