@@ -26,7 +26,7 @@ from yolo.yolo_6d_net import YOLO6D_net
 
 class Solver(object):
 
-    def __init__(self, net, data, tfrecord, arg=None):
+    def __init__(self, net, data, arg=None):
 
         #Set parameters for training and testing
         self.meshname = data.meshname
@@ -46,8 +46,6 @@ class Solver(object):
         self.saveconfig = False
         self.net = net
         self.data = data
-        self.reader = tf.TFRecordReader()
-        self.tfrecords = 'data/train.tfrecord'
         self.batch_size = cfg.BATCH_SIZE
         self.epoch = cfg.EPOCH
         self.weight_file = cfg.WEIGHTS_FILE  # data/weights/
@@ -108,31 +106,12 @@ class Solver(object):
         self.net.evaluation_off()
         train_timer = Timer()
         load_timer = Timer()
-        file_name_queue = tf.train.string_input_producer([self.tfrecords], num_epochs=None)
-        __, serialized_example = self.reader.read(file_name_queue)
-        features = tf.parse_single_example(serialized_example,
-                                           features={
-                                               'labels':tf.FixedLenFeature([], tf.string),
-                                               'images':tf.FixedLenFeature([], tf.string),
-                                           })
 
         epoch = 0
         while epoch <= self.epoch:
             for step in range(0, self.max_iter-1):
                 load_timer.tic()
-                # images, labels = self.data.next_batches()
-
-                images = tf.decode_raw(features['images'], tf.float32)
-                labels = tf.decode_raw(features['labels'], tf.float32)
-                if True:
-                    batch = self.batch_size
-                    min_after_dequeue = 10
-                    capacity = min_after_dequeue + 3 * batch
-                    images, labels = tf.train.shuffle_batch([images, labels],
-                                                            batch_size=batch,
-                                                            num_threads=3,
-                                                            capacity=capacity,
-                                                            min_after_dequeue=min_after_dequeue)
+                images, labels = self.data.next_batches()
                 load_timer.toc()
 
                 feed_dict = {self.net.input_images: images, self.net.labels: labels}
@@ -207,26 +186,7 @@ class Solver(object):
         eps = 1e-5
 
         load_timer.tic()
-        # images, labels = self.data.next_batches_test()
-
-        file_name_queue = tf.train.string_input_producer([self.tfrecords], num_epochs=None)
-        __, serialized_example = self.reader.read(file_name_queue)
-        features = tf.parse_single_example(serialized_example,
-                                           features={
-                                               'labels':tf.FixedLenFeature([], tf.string),
-                                               'images':tf.FixedLenFeature([], tf.string),
-                                           })
-        images = tf.decode_raw(features['images'], tf.float32)
-        labels = tf.decode_raw(features['labels'], tf.float32)
-        if True:
-            batch = self.batch_size
-            min_after_dequeue = 10
-            capacity = min_after_dequeue + 3 * batch
-            images, labels = tf.train.shuffle_batch([images, labels],
-                                                    batch_size=batch,
-                                                    num_threads=3,
-                                                    capacity=capacity,
-                                                    min_after_dequeue=min_after_dequeue)
+        images, labels = self.data.next_batches_test()
         truths = self.data.get_truths() #2-D [Batch, params]
         load_timer.toc()
 
