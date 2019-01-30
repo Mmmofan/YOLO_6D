@@ -17,7 +17,6 @@ import numpy as np
 import tensorflow as tf
 
 import yolo.config as cfg
-from pascal_voc import Pascal_voc
 from linemod import Linemod
 from utils.MeshPly import MeshPly
 from utils.timer import Timer
@@ -70,16 +69,16 @@ class Solver(object):
         self.summary_op = tf.summary.merge_all()
         self.writer = tf.summary.FileWriter(self.output_dir, flush_secs=60)
 
-        self.global_step = tf.get_variable(
-            'global_step', [], initializer=tf.constant_initializer(0.0), trainable=False)
+        #self.global_step = tf.get_variable('global_step', [], initializer=tf.constant_initializer(0.0), trainable=False)
+        self.global_step = tf.Variable(0, name='global_step', trainable=False)
         # self.learning_rate = tf.train.exponential_decay(self.inital_learning_rate, self.global_step,
                                                         # self.decay_steps, self.decay_rate, self.staircase, name='learning_rate')
         if arg.pre:
             boundaries = [1, 50, 1000, 2000]
-            learning_rate = [0.0001, 0.001, 0.0001, 0.00001]
+            learning_rate = [0.001, 0.0001, 0.001, 0.0001, 0.00001]
         else:
             boundaries = [1, 50, 3000, 6000]
-            learning_rate = [0.0001, 0.001, 0.0001, 0.00001]
+            learning_rate = [0.001, 0.0001, 0.001, 0.0001, 0.00001]
         self.learning_rate = tf.train.piecewise_constant(self.global_step, boundaries, learning_rate, name='learning_rate')
         #self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(
         #    self.net.total_loss, global_step=self.global_step)
@@ -355,8 +354,6 @@ def main():
     parser.add_argument('--weights', default="yolo_6d.ckpt", type=str)
     parser.add_argument('--pre', default=False, type=bool)
     parser.add_argument('--data_dir', default="data", type=str)
-    parser.add_argument('--threshold', default=0.2, type=float)
-    parser.add_argument('--iou_threshold', default=0.5, type=float)
     parser.add_argument('--gpu', default='0', type=str)
     args = parser.parse_args()
 
@@ -375,7 +372,9 @@ def main():
 
     yolo = YOLO6D_net()
     datasets = Linemod('train', arg=args.datacfg)
-    solver = Solver(yolo, datasets, arg=args)
+    tfrecords = 'data/train.tfrecords'
+    # solver = Solver(yolo, datasets, arg=args)
+    solver = Solver(yolo, datasets, tfrecords, arg=args)
 
     print("\n-----------------------------start training----------------------------")
     tic = time.clock()
