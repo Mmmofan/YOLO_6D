@@ -124,7 +124,7 @@ class Linemod(object):
                 labels = f.readline().split()
             for j in range(len(labels)):
                 labels[j] = float(labels[j])
-            labels[0] = int(labels[0])
+            labels[0] = int(labels[0]) * 1.0
             gt_labels.append(labels)
         return gt_labels
 
