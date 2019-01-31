@@ -54,21 +54,44 @@ def softmax(X, theta = 1.0, axis = None):
     if len(X.shape) == 1: p = p.flatten()
     return p
 
-def cross_entropy(logit, label, weights):
+def softmax_cross_entropy(logit, label, weights):
     """
     logit: output [B, C, C, classes]
     label: ground truth [B, C, C, classes]
     weigth: [B, C, C, 1]
     """
-    logit = softmax(logit, axis=3)
     logit_shape = logit.get_shape()
     label_shape = label.get_shape()
     assert(logit_shape == label_shape)
-    weight = tf.tile(weights, [1, 1, 1, logit_shape[-1]])
 
-    cross_entropy_loss = tf.reduce_sum(tf.multiply(tf.multiply(label, tf.log(logit)), weight))
+    logit = tf.exp(logit)
+    logit_sum = tf.reduce_sum(logit, 3, keep_dims=True)
+    logit_sum = tf.tile(logit_sum, [1, 1, 1, logit_shape[3]])
+    softmax = tf.divide(logit, logit_sum)
+
+    # weight = tf.tile(weights, [1, 1, 1, logit_shape[3]])
+
+    cross_entropy_loss = tf.multiply(tf.reduce_sum(-1.0 * label * tf.log(softmax), 3, keep_dims=True), weights)
+    cross_entropy_loss = tf.abs(tf.reduce_sum(cross_entropy_loss))
 
     return cross_entropy_loss
+
+def mean_squared_error(logit, label, weights):
+    """
+    logit: output [B, C, C, D]
+    label: ground truth [B, C, C, D]
+    weights: [B, C, C, 1]
+    """
+    logit_shape = logit.get_shape()
+    label_shape = label.get_shape()
+    assert(logit_shape == label_shape)
+    # logit_mean = tf.reduce_mean(logit, 3, keep_dims=True)
+    # logit_mean = tf.tile(logit_mean, [1, 1, 1, logit_shape[3]])
+    diff = tf.squared_difference(logit, label)
+    diff_mean = tf.reduce_mean(diff, 3, keep_dims=True)
+    error = tf.multiply(diff_mean, weights)
+    error = tf.reduce_sum(error)
+    return error
 
 def confidence_func(x, weights):
     """

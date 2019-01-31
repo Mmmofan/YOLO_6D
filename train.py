@@ -60,7 +60,10 @@ class Solver(object):
         if self.saveconfig:
             self.save_config()
 
-        self.variable_to_restore = tf.global_variables()[:-2]
+        if arg.pre == True:
+            self.variable_to_restore = tf.global_variables()[:-2]
+        else:
+            self.variable_to_restore = tf.global_variables()
         self.variable_to_save = tf.global_variables()
         self.restorer = tf.train.Saver(self.variable_to_restore, max_to_keep=3)
         self.saver = tf.train.Saver(self.variable_to_save, max_to_keep=3)
@@ -75,10 +78,10 @@ class Solver(object):
                                                         # self.decay_steps, self.decay_rate, self.staircase, name='learning_rate')
         if arg.pre:
             boundaries = [1, 50, 1000, 2000]
-            learning_rate = [0.00001, 0.0001, 0.001, 0.0001, 0.00001]
+            learning_rate = [0.001, 0.0001, 0.001, 0.0001, 0.00001]
         else:
             boundaries = [1, 50, 3000, 6000]
-            learning_rate = [0.00001, 0.0001, 0.001, 0.0001, 0.00001]
+            learning_rate = [0.001, 0.0001, 0.001, 0.0001, 0.00001]
 
         self.learning_rate = tf.train.piecewise_constant(self.global_step, boundaries, learning_rate, name='learning_rate')
         # self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(
@@ -137,7 +140,7 @@ class Solver(object):
                             train_timer.average_time,
                             load_timer.average_time,
                             train_timer.remain(step, self.max_iter))
-                        print("==================================================================")
+                        print("=======================================================================")
                         print(log_str)
 
                         # test
@@ -167,7 +170,7 @@ class Solver(object):
                     datetime.datetime.now().strftime('%m/%d %H:%M:%S')
                     print('   Save checkpoint file to: {}'.format(
                         self.weight_file))
-                    print("==================================================================")
+                    print("=======================================================================")
                     self.saver.save(self.sess, self.weight_file,
                                     global_step=self.global_step)
             epoch += 1
