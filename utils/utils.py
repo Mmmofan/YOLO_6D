@@ -143,10 +143,11 @@ def get_max_index(confidence):
     confidence: 2-D tensor [cell_size, cell_size]
     return the index of maximum value of confidence
     """
-    maxj = tf.argmax(confidence)
-    maxj = tf.argmax(maxj)
-    maxi = tf.argmax(confidence, axis=1)
-    maxi = tf.argmax(maxi)
+    max_val  = tf.reduce_max(confidence)
+    bool_idx = tf.equal(confidence, max_val)
+    int_idx  = tf.where(bool_idx)
+    maxi = int_idx[0][0]
+    maxj = int_idx[0][1]
     return maxi, maxj
 
 def confidence_thresh(cscs, predicts, threshold=cfg.CONF_THRESHOLD):

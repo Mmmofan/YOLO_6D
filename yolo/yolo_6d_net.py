@@ -204,8 +204,7 @@ class YOLO6D_net:
             for i in range(self.Batch_Size):
                 pred_conf = predict_conf[i]
                 pred_conf = tf.reshape(pred_conf, [self.cell_size, self.cell_size])
-                max_conf_ts = tf.cast(pred_conf >= tf.reduce_max(pred_conf), tf.float32)
-                max_index_i, max_index_j = get_max_index(max_conf_ts)
+                max_index_i, max_index_j = get_max_index(pred_conf)
                 max_conf_ids.append([max_index_i, max_index_j])
             pred_tensor = []  # restore tensors
             for i in range(self.Batch_Size):
