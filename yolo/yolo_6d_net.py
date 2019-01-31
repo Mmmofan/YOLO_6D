@@ -200,15 +200,12 @@ class YOLO6D_net:
         with tf.variable_scope(scope):
             ## Predicts
             predict_conf = tf.reshape(predicts[:, :, :, -1], [self.Batch_Size, self.cell_size, self.cell_size, 1])  # get predicted confidence
-            max_conf_ids = []  # record maximum confidence index
+            pred_tensor = []  # restore tensors
             for i in range(self.Batch_Size):
                 pred_conf = predict_conf[i]
                 pred_conf = tf.reshape(pred_conf, [self.cell_size, self.cell_size])
                 max_index_i, max_index_j = get_max_index(pred_conf)
-                max_conf_ids.append([max_index_i, max_index_j])
-            pred_tensor = []  # restore tensors
-            for i in range(self.Batch_Size):
-                pred_tensor.append(predicts[i, max_conf_ids[i, 0], max_conf_ids[i, 1], :])
+                pred_tensor.append(predicts[i, max_index_i, max_index_j, :])               
             pred_tensor = tf.convert_to_tensor(pred_tensor)
 
             predict_centroids = pred_tensor[:, :2*self.boxes_per_cell]
@@ -220,15 +217,12 @@ class YOLO6D_net:
 
             ## Ground Truth
             response = tf.reshape(labels[:, :, :, 0], [self.Batch_Size, self.cell_size, self.cell_size, 1])
-            response_ids = []
+            gt_tensor = []
             for i in range(self.Batch_Size):
                 gt_resp = response[i]
                 gt_resp = tf.reshape(gt_resp, [self.cell_size, self.cell_size])
                 max_index_i, max_index_j = get_max_index(gt_resp)
-                response_ids.append([max_index_i, max_index_j])
-            gt_tensor = []
-            for i in range(self.Batch_Size):
-                gt_tensor.append(labels[i, response_ids[i, 0], response_ids[i, 1], :])
+                gt_tensor.append(labels[i, max_index_i, max_index_j, :])
             gt_tensor = tf.convert_to_tensor(gt_tensor)
 
             labels_coord   = gt_tensor[:, 1:self.boundry_1+1]
