@@ -21,7 +21,6 @@ import numpy as np
 import tensorflow as tf
 
 import yolo.config as cfg
-from pascal_voc import Pascal_voc
 from linemod import Linemod
 from utils.MeshPly import MeshPly
 from utils.timer import Timer
