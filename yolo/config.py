@@ -35,7 +35,7 @@ CHANNELS = 3
 BATCH_NORM = True
 
 ALPHA = 2.0
-Dth = 30.0   ###30 pixels
+Dth = 80.0
 
 CELL_SIZE = 13
 NUM_COORD = 18
