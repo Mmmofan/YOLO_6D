@@ -68,17 +68,12 @@ class YOLO6D_net:
         self.labels = tf.placeholder(tf.float32, [None, self.cell_size, self.cell_size, 18 + 1 + self.num_class], name='Labels')
 
         self.logit = self._build_net(self.input_images)
-        self.confidence = None
-        self.Euclid_dist = None
 
         if is_training:
             # self.total_loss = self.loss_layer(self.logit, self.labels)
             self.loss_layer(self.logit, self.labels)
             self.total_loss = tf.losses.get_total_loss()
             tf.summary.scalar('Total loss', self.total_loss)
-
-        #self.conf_value = tf.reshape(self.logit[:, :, :, -1], [-1, self.cell_size, self.cell_size, 1])
-        # self.conf_score = self.confidence_score(self.logit, self.confidence)
 
 
     def _build_net(self, input):
@@ -210,25 +205,6 @@ class YOLO6D_net:
                 pred_conf = tf.reshape(pred_conf, [self.cell_size, self.cell_size])
                 pred_i, pred_j = get_max_index(pred_conf)
                 temp_tensor = predicts[i, pred_i, pred_j, :]
-                # value_i, value_j = tf.cast(max_index_i, tf.float32), tf.cast(max_index_j, tf.float32)
-                # temp_tensor[0]  = tf.add(temp_tensor[0], value_i)
-                # temp_tensor[1]  += value_j
-                # temp_tensor[2]  += value_i
-                # temp_tensor[3]  += value_j
-                # temp_tensor[4]  += value_i
-                # temp_tensor[5]  += value_j
-                # temp_tensor[6]  += value_i
-                # temp_tensor[7]  += value_j
-                # temp_tensor[8]  += value_i
-                # temp_tensor[9]  += value_j
-                # temp_tensor[10] += value_i
-                # temp_tensor[11] += value_j
-                # temp_tensor[12] += value_i
-                # temp_tensor[13] += value_j
-                # temp_tensor[14] += value_i
-                # temp_tensor[15] += value_j
-                # temp_tensor[16] += value_i
-                # temp_tensor[17] += value_j
                 pred_tensor.append(temp_tensor)
                 pred_index.append([pred_i, pred_j])
                 conf_mask = tf.sparse_tensor_to_dense(tf.SparseTensor([[i, pred_i, pred_j, 0]], [1.0], [self.Batch_Size, self.cell_size, self.cell_size, 1]))
@@ -253,25 +229,6 @@ class YOLO6D_net:
                 gt_resp = tf.reshape(gt_resp, [self.cell_size, self.cell_size])
                 gt_i, gt_j = get_max_index(gt_resp)
                 temp_tensor = labels[i, gt_i, gt_j, :]
-                # value_i, value_j = tf.cast(gt_i, tf.float32), tf.cast(gt_j, tf.float32)
-                # temp_tensor[1]  += value_i
-                # temp_tensor[2]  += value_j
-                # temp_tensor[3]  += value_i
-                # temp_tensor[4]  += value_j
-                # temp_tensor[5]  += value_i
-                # temp_tensor[6]  += value_j
-                # temp_tensor[7]  += value_i
-                # temp_tensor[8]  += value_j
-                # temp_tensor[9]  += value_i
-                # temp_tensor[10] += value_j
-                # temp_tensor[11] += value_i
-                # temp_tensor[12] += value_j
-                # temp_tensor[13] += value_i
-                # temp_tensor[14] += value_j
-                # temp_tensor[15] += value_i
-                # temp_tensor[16] += value_j
-                # temp_tensor[17] += value_i
-                # temp_tensor[18] += value_j
                 gt_tensor.append(temp_tensor)
                 gt_index.append([gt_i, gt_j])
             gt_tensor = tf.convert_to_tensor(gt_tensor)
@@ -288,7 +245,6 @@ class YOLO6D_net:
             for i in range(self.Batch_Size):
                 labels_conf.append(response[i] * confidence[i,0])
             labels_conf = tf.convert_to_tensor(labels_conf)
-            print(labels_conf.get_shape())
 
 
             ## Set coefs for loss

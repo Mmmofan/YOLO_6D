@@ -185,6 +185,8 @@ def dist9(x1, x2, pred_index, gt_index):
         gt       = x2[i]
         pred_idx = tf.cast(pred_index[i], tf.float32)
         gt_idx   = tf.cast(gt_index[i], tf.float32)
+
+        # compute delta-x, delta-y
         temp     = tf.stack([pred[0]+pred_idx[0]-gt[0]-gt_idx[0], pred[1]+pred_idx[1]-gt[1]-gt_idx[1],
                              pred[2]+pred_idx[0]-gt[2]-gt_idx[0], pred[3]+pred_idx[1]-gt[3]-gt_idx[1],
                              pred[4]+pred_idx[0]-gt[2]-gt_idx[0], pred[5]+pred_idx[1]-gt[3]-gt_idx[1],
@@ -196,7 +198,9 @@ def dist9(x1, x2, pred_index, gt_index):
                              pred[16]+pred_idx[0]-gt[2]-gt_idx[0], pred[17]+pred_idx[1]-gt[3]-gt_idx[1]])
         diff.append(temp)
     diff = tf.convert_to_tensor(diff)
+    diff *= 32.0  # in pixel size
 
+    # compute delta-x**2, delta-y**2
     diff = tf.square(diff)
 
     predict_x = tf.stack([diff[:,0], diff[:,2], diff[:,4], diff[:,6],
@@ -204,7 +208,7 @@ def dist9(x1, x2, pred_index, gt_index):
     predict_y = tf.stack([diff[:,1], diff[:,3], diff[:,5], diff[:,7],
                           diff[:,9], diff[:,11], diff[:,13], diff[:,15], diff[:,17]], 1)
 
-    # sqrt(delta x**2 + delta y**2)
+    # compute sqrt(delta-x**2 + delta-y**2)
     distance = tf.sqrt(tf.add(predict_x, predict_y))
 
     return distance
