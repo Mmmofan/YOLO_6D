@@ -30,20 +30,20 @@ from yolo.yolo_6d_net import YOLO6D_net
 class Detector(object):
 
     def __init__(self, net, data, weights_file):
-        self.yolo = net
-        self.data = data
-        self.num_classes = cfg.NUM_CLASSES
-        self.image_size = cfg.IMAGE_SIZE
-        self.cell_size = cfg.CELL_SIZE
-        self.batch_size = cfg.BATCH_SIZE
+        self.yolo           = net
+        self.data           = data
+        self.num_classes    = cfg.NUM_CLASSES
+        self.image_size     = cfg.IMAGE_SIZE
+        self.cell_size      = cfg.CELL_SIZE
+        self.batch_size     = cfg.BATCH_SIZE
         self.boxes_per_cell = cfg.BOXES_PER_CELL
-        self.threshold = cfg.CONF_THRESHOLD
-        self.categories = ['ape', 'benchvise', 'cam', 'can', 'cat', 'driller', 'duck',
-                           'eggbox', 'glue', 'holepuncher', 'iron', 'lamp', 'phone']
+        self.threshold      = cfg.CONF_THRESHOLD
+        self.categories     = ['ape', 'benchvise', 'cam', 'can', 'cat', 'driller', 'duck',
+                               'eggbox', 'glue', 'holepuncher', 'iron', 'lamp', 'phone']
 
         self.variable_to_restore = tf.global_variables()
-        self.restorer = tf.train.Saver(self.variable_to_restore)
-        self.sess = tf.Session()
+        self.restorer            = tf.train.Saver(self.variable_to_restore)
+        self.sess                = tf.Session()
         self.sess.run(tf.global_variables_initializer())
         print("-------------restoring weights file from {}---------------".format(weights_file))
         self.restorer.restore(self.sess, weights_file)
@@ -51,15 +51,15 @@ class Detector(object):
     def detect(self):
         all_images = self.data.imgname
         all_labels = self.data.gt_labels
-        acc = []
+        assert(len(all_images)==len(all_labels))
         for i in range(len(all_images)):
-            image_path = all_images[i]
-            gt_label = all_labels[i]
+            image_path   = all_images[i]
+            gt_label     = all_labels[i]
             image, label = self.data_read(image_path, gt_label)
-            w, h, d = image.shape[0], image.shape[1], image.shape[2]
-            input_image = np.reshape(image, [1, w, h, d])
-            feed_dict = {self.yolo.input_images: input_image}
-            output = self.sess.run(self.yolo.logit, feed_dict=feed_dict)
+            w, h, d      = image.shape[0], image.shape[1], image.shape[2]
+            input_image  = np.reshape(image, [1, w, h, d])
+            feed_dict    = {self.yolo.input_images: input_image}
+            output       = self.sess.run(self.yolo.logit, feed_dict=feed_dict)
             self.post_process(output, image_path)
 
     def post_process(self, input, image_path):
@@ -104,7 +104,7 @@ class Detector(object):
 
         for box in boxes:
             self.draw(box, image_path)
-        
+
         print('image showed')
 
     def draw(self, box, image_path):
@@ -144,7 +144,7 @@ class Detector(object):
 
         labels = np.zeros((13, 13, 1+self.boxes_per_cell*9*2 + self.num_classes), np.float32)
 
-        gt_label = gt_labels[0]
+        gt_label = int(gt_labels[0])
         gt_xc = gt_labels[1]  * 13
         gt_yc = gt_labels[2]  * 13
         gt_x0 = gt_labels[3]  * 13
@@ -172,6 +172,9 @@ class Detector(object):
 
         # set response value to 1
         labels[response_x, response_y, 0] = 1
+        # set label
+        label_num = 19 + gt_label
+        labels[response_x, response_y, label_num] = 1
 
         # set coodinates value
         for i in range(1, 19, 1):
@@ -180,8 +183,6 @@ class Detector(object):
             else: # y
                 labels[response_x, response_y, i] = coords[i - 1] - response_y
 
-        # set label
-        labels[response_x, response_y, 19 + gt_label] = 1
 
         return labels
 
