@@ -52,7 +52,8 @@ class Detector(object):
         all_images = self.data.imgname
         all_labels = self.data.gt_labels
         assert(len(all_images)==len(all_labels))
-        for i in range(len(all_images)):
+        # for i in range(len(all_images)):
+        for i in range(10):
             image_path   = all_images[i]
             gt_label     = all_labels[i]
             image, label = self.data_read(image_path, gt_label)
@@ -60,9 +61,9 @@ class Detector(object):
             input_image  = np.reshape(image, [1, w, h, d])
             feed_dict    = {self.yolo.input_images: input_image}
             output       = self.sess.run(self.yolo.logit, feed_dict=feed_dict)
-            self.post_process(output, image_path)
+            self.post_process(output, image_path, i)
 
-    def post_process(self, input, image_path):
+    def post_process(self, input, image_path, number):
         coords = input[:, :, :, :18]
         class_prob = input[:, :, :, 18:-1]
         confidence = input[:, :, :, -1].reshape(-1,coords.shape[1],coords.shape[2], 1)
@@ -75,7 +76,7 @@ class Detector(object):
             conf = confs[i]
             idxi, idxj = np.where(conf == np.max(conf))
             idxi, idxj = idxi[0], idxj[0]
-            # idxi, idxj = 5, 5
+            idxi, idxj = 5, 4
             classes = class_prob[i,idxi,idxj,:]
             classes = softmax(classes)
             class_id = np.where(classes==np.max(classes))
@@ -103,11 +104,11 @@ class Detector(object):
             boxes.append(box)
 
         for box in boxes:
-            self.draw(box, image_path)
+            self.draw(box, image_path, number)
 
         print('image showed')
 
-    def draw(self, box, image_path):
+    def draw(self, box, image_path, number):
         image = cv2.imread(image_path)
         xc, yc, x1, y1, x2, y2, x3, y3, x4, y4 = int(box[0]*416), int(box[1]*416), int(box[2]*416), int(box[3]*416), int(box[4]*416), \
                                                   int(box[5]*416), int(box[6]*416), int(box[7]*416), int(box[8]*416), int(box[9]*416)
@@ -123,7 +124,8 @@ class Detector(object):
         cv2.line(image, (x2, y2), (x6, y6), (0,255,0), 2)
         cv2.line(image, (x8, y8), (x4, y4), (0,255,0), 2)
         cv2.line(image, (x8, y8), (x6, y6), (0,255,0), 2)
-        cv2.imwrite('draw.jpg', image)
+        name = 'draw' + str(number) + '.jpg'
+        cv2.imwrite(name, image)
 
     def data_read(self, img, lbl):
         image = self.image_read(img)

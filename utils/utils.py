@@ -139,79 +139,73 @@ def dist(x1, x2):
 
     return distance
 
-def confidence_func9(x):
+def confidence9(pred_x, pred_y, gt_coord, gt_index):
     """
     Args:
-        x: a 2-D tensor: [Batch_size, 9]
-        compute confidence score then concat to original
-    Returns:
-        a 2-D tensor: [Batch_Size, 1]
-    """
-    alpha = tf.constant(cfg.ALPHA, dtype=tf.float32)
-    dth_in_cell_size = tf.constant(cfg.Dth, dtype=tf.float32)
-    one = tf.ones_like(x, dtype=tf.float32)
-
-    # if number in x <= dth_in_cell_size, the position in temp would be 1.0,
-    # otherwise(x > dth_int_cell_size) would be 0
-    temp = tf.cast(x <= dth_in_cell_size, tf.float32)
-
-    confidence = (tf.exp(alpha * (one - x / dth_in_cell_size)) - one) / ((tf.exp(alpha) - one) + cfg.EPSILON)
-
-    # if distance in x bigger than threshold, value calculated will be negtive,
-    # use below to make the negtive to 0
-    confidence = tf.multiply(confidence, temp)
-
-    confidence = tf.reduce_mean(confidence, 1, keep_dims=True)
-
-    return confidence
-
-def dist9(x1, x2, pred_index, gt_index):
-    """
-    Args:
-        x1: 2-D tensor, [batch_size, 18]
-        x2: 2-D tensor, [batch_size, 18]
-        pred_index: 2-D tensor, [batch_size, 2]
+        pred_x: 4-D tensor, [batch_size, cell_size, cell_size, 9]
+        pred_y: 4-D tensor, [batch_size, cell_size, cell_size, 9]
+        gt_coord: 2-D tensor, [batch_size, 18]
         gt_index  : 2-D tensor, [batch_size, 2]
     Return:
-        mean confidence with shape [batch, 9]
+        mean distance with shape [batch, cell_size, cell_size, 9]
     """
-    # make x1, x2 in pixel size
-    # x1, x2 = x1 * 32, x2 * 32
-    # delta x**2, delta y**2, in pixel level
+    for i in range(cfg.BATCH_SIZE):
+        gt_idx = tf.cast(gt_index[i], tf.float32)
+
+    #gt_x = tf.concat([gt_coord[0]+])
     shape = x1.get_shape()
-    diff  = []
-    for i in range(shape[0]):
-        pred     = x1[i]
-        gt       = x2[i]
-        pred_idx = tf.cast(pred_index[i], tf.float32)
-        gt_idx   = tf.cast(gt_index[i], tf.float32)
+    alpha = tf.constant(cfg.ALPHA, dtype=tf.float32)
+    output = np.zeros([cfg.BATCH_SIZE, shape[1], shape[2], 1])
+    dth_in_cell_size = tf.constant(cfg.Dth, dtype=tf.float32)
+    one = tf.ones([cfg.BATCH_SIZE, 9], dtype=tf.float32)
 
-        # compute delta-x, delta-y
-        temp     = tf.stack([pred[0]+pred_idx[0]-gt[0]-gt_idx[0], pred[1]+pred_idx[1]-gt[1]-gt_idx[1],
-                             pred[2]+pred_idx[0]-gt[2]-gt_idx[0], pred[3]+pred_idx[1]-gt[3]-gt_idx[1],
-                             pred[4]+pred_idx[0]-gt[2]-gt_idx[0], pred[5]+pred_idx[1]-gt[3]-gt_idx[1],
-                             pred[6]+pred_idx[0]-gt[2]-gt_idx[0], pred[7]+pred_idx[1]-gt[3]-gt_idx[1],
-                             pred[8]+pred_idx[0]-gt[2]-gt_idx[0], pred[9]+pred_idx[1]-gt[3]-gt_idx[1],
-                             pred[10]+pred_idx[0]-gt[2]-gt_idx[0], pred[11]+pred_idx[1]-gt[3]-gt_idx[1],
-                             pred[12]+pred_idx[0]-gt[2]-gt_idx[0], pred[13]+pred_idx[1]-gt[3]-gt_idx[1],
-                             pred[14]+pred_idx[0]-gt[2]-gt_idx[0], pred[15]+pred_idx[1]-gt[3]-gt_idx[1],
-                             pred[16]+pred_idx[0]-gt[2]-gt_idx[0], pred[17]+pred_idx[1]-gt[3]-gt_idx[1]])
-        diff.append(temp)
-    diff = tf.convert_to_tensor(diff)
-    diff *= 32.0  # in pixel size
+    output1, output2, output3 = [], [], []
+    for i in range(cfg.BATCH_SIZE):
+        for j in range(shape[1]):
+            for k in range(shape[2]):
+                pred     = x1[i,j,k,:] # [18,]
+                gt       = x2[i] # [18, ]
+                index    = [j, k]
+                pred_idx = tf.cast(index, tf.float32)
+                gt_idx   = tf.cast(gt_index[i], tf.float32)
 
-    # compute delta-x**2, delta-y**2
-    diff = tf.square(diff)
+                # compute delta-x, delta-y. shape: [18]
+                temp     = tf.stack([pred[0] +pred_idx[0]-gt[0] -gt_idx[0],  pred[1]+pred_idx[1]-gt[1] -gt_idx[1],
+                                     pred[2] +pred_idx[0]-gt[2] -gt_idx[0],  pred[3]+pred_idx[1]-gt[3] -gt_idx[1],
+                                     pred[4] +pred_idx[0]-gt[4] -gt_idx[0],  pred[5]+pred_idx[1]-gt[5] -gt_idx[1],
+                                     pred[6] +pred_idx[0]-gt[6] -gt_idx[0],  pred[7]+pred_idx[1]-gt[7] -gt_idx[1],
+                                     pred[8] +pred_idx[0]-gt[8] -gt_idx[0],  pred[9]+pred_idx[1]-gt[9] -gt_idx[1],
+                                     pred[10]+pred_idx[0]-gt[10]-gt_idx[0], pred[11]+pred_idx[1]-gt[11]-gt_idx[1],
+                                     pred[12]+pred_idx[0]-gt[12]-gt_idx[0], pred[13]+pred_idx[1]-gt[13]-gt_idx[1],
+                                     pred[14]+pred_idx[0]-gt[14]-gt_idx[0], pred[15]+pred_idx[1]-gt[15]-gt_idx[1],
+                                     pred[16]+pred_idx[0]-gt[16]-gt_idx[0], pred[17]+pred_idx[1]-gt[17]-gt_idx[1]])
+                temp     = 32 * temp  # in pixel size
+                temp     = tf.square(temp)
+                temp_x   = tf.stack([temp[0], temp[2], temp[4], temp[6], temp[8], temp[10], temp[12], temp[14], temp[16]])
+                temp_y   = tf.stack([temp[1], temp[3], temp[5], temp[7], temp[9], temp[11], temp[13], temp[15], temp[17]])
+                temp     = tf.sqrt(temp_x + temp_y)
 
-    predict_x = tf.stack([diff[:,0], diff[:,2], diff[:,4], diff[:,6],
-                          diff[:,8], diff[:,10], diff[:,12], diff[:,14], diff[:,16]], 1)
-    predict_y = tf.stack([diff[:,1], diff[:,3], diff[:,5], diff[:,7],
-                          diff[:,9], diff[:,11], diff[:,13], diff[:,15], diff[:,17]], 1)
+                # if number in x <= dth_in_cell_size, the position in temp would be 1.0,
+                # otherwise(x > dth_int_cell_size) would be 0
+                mask = tf.cast(temp <= dth_in_cell_size, tf.float32)
 
-    # compute sqrt(delta-x**2 + delta-y**2)
-    distance = tf.sqrt(tf.add(predict_x, predict_y))
+                confidence = (tf.exp(alpha * (one - temp / dth_in_cell_size)) - one) / ((tf.exp(alpha) - one) + cfg.EPSILON)
 
-    return distance
+                # if distance in x bigger than threshold, value calculated will be negtive,
+                # use below to make the negtive to 0
+                confidence = tf.multiply(confidence, mask)
+                confidence = tf.reduce_mean(confidence)
+
+                output3.append(confidence)
+            output3 = tf.convert_to_tensor(output3)
+            output2.append(output3)
+            output3 = []
+        output2 = tf.convert_to_tensor(output2)
+        output1.append(output2)
+        output2 = []
+    output1 = tf.convert_to_tensor(output1)
+
+    return output
 
 def get_max_index(confidence):
     """

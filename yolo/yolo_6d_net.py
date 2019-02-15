@@ -197,7 +197,6 @@ class YOLO6D_net:
             predict_conf = tf.reshape(predicts[:, :, :, -1], [self.Batch_Size, self.cell_size, self.cell_size, 1])  # get predicted confidence
             # conf_mask = tf.zeros([self.Batch_Size, self.cell_size, self.cell_size, 1], dtype=tf.int32)
             pred_tensor = []  # restore tensors
-            pred_index  = []  # restore index
 
             # get the max confidence tensor
             for i in range(self.Batch_Size):
@@ -206,16 +205,14 @@ class YOLO6D_net:
                 pred_i, pred_j = get_max_index(pred_conf)
                 temp_tensor = predicts[i, pred_i, pred_j, :]
                 pred_tensor.append(temp_tensor)
-                pred_index.append([pred_i, pred_j])
                 conf_mask = tf.sparse_tensor_to_dense(tf.SparseTensor([[i, pred_i, pred_j, 0]], [1.0], [self.Batch_Size, self.cell_size, self.cell_size, 1]))
             pred_tensor = tf.convert_to_tensor(pred_tensor)
-            pred_index  = tf.convert_to_tensor(pred_index)
 
             predict_centroids = pred_tensor[:, :2*self.boxes_per_cell]
             predict_corners   = pred_tensor[:, 2*self.boxes_per_cell:self.boundry_1]
             predict_coord_tr  = tf.concat([tf.nn.sigmoid(predict_centroids), predict_corners], 1)
             predict_classes   = pred_tensor[:, self.boundry_1:-1]
-            # predict_boxes_tr  = tf.concat([tf.nn.sigmoid(predicts[:,:,:,:2]), predicts[:,:,:,2:self.boundry_1]], 3)
+            predict_boxes_tr  = tf.concat([tf.nn.sigmoid(predicts[:,:,:,:2]), predicts[:,:,:,2:self.boundry_1]], 3)
 
 
             ## Ground Truth
@@ -238,13 +235,24 @@ class YOLO6D_net:
             labels_classes = gt_tensor[:, self.boundry_1+1: ]
             labels_conf    = []
 
-            ## Calculate confidence (instead of IoU like in YOLOv2)
-            dist = dist9(predict_coord_tr, labels_coord, pred_index, gt_index)
-            confidence = confidence_func9(dist) # [batch, 1]
 
-            for i in range(self.Batch_Size):
-                labels_conf.append(response[i] * confidence[i,0])
-            labels_conf = tf.convert_to_tensor(labels_conf)
+            ## offset
+            off_set_y = np.tile(np.reshape(np.array([np.arange(13)] * 13 ), (13, 13, 1)), (1, 1, 9))
+            off_set_x = np.transpose(off_set_y, (1, 0, 2))
+            off_set_x = np.tile(np.transpose(np.reshape(off_set_x, (13, 13, 9, 1)), (3, 0, 1, 2)), (4, 1, 1, 1))
+            off_set_y = np.tile(np.transpose(np.reshape(off_set_y, (13, 13, 9, 1)), (3, 0, 1, 2)), (4, 1, 1, 1))
+            predict__x = tf.stack([predict_boxes_tr[:,:,:,0], predict_boxes_tr[:,:,:,2], predict_boxes_tr[:,:,:,4], 
+                                    predict_boxes_tr[:,:,:,6], predict_boxes_tr[:,:,:,8], predict_boxes_tr[:,:,:,10], 
+                                    predict_boxes_tr[:,:,:,12], predict_boxes_tr[:,:,:,14], predict_boxes_tr[:,:,:,16]])
+            predict__y = tf.stack([predict_boxes_tr[:,:,:,1], predict_boxes_tr[:,:,:,3], predict_boxes_tr[:,:,:,5], 
+                                    predict_boxes_tr[:,:,:,7], predict_boxes_tr[:,:,:,9], predict_boxes_tr[:,:,:,11], 
+                                    predict_boxes_tr[:,:,:,13], predict_boxes_tr[:,:,:,15], predict_boxes_tr[:,:,:,17]])
+            pred_box_x = predict__x + off_set_x
+            pred_box_y = predict__y + off_set_y
+
+
+            ## Calculate confidence (instead of IoU like in YOLOv2)
+            labels_conf = confidence9(pred_box_x, pred_box_y, labels_coord, gt_index) # [batch, cell, cell, 1]
 
 
             ## Set coefs for loss
