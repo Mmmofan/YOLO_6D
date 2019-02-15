@@ -124,6 +124,7 @@ def dist(x1, x2):
         x2: 4-D tensor, [batch_size, cell, cell, 18]
     Return:
     """
+    # make x1, x2 in pixel size
     x1, x2 = x1 * 32, x2 * 32
     # delta x-square, y-square, in pixel level
     diff = tf.squared_difference(x1, x2)
@@ -138,6 +139,74 @@ def dist(x1, x2):
 
     return distance
 
+def confidence9(pred_x, pred_y, gt_coord, gt_index):
+    """
+    Args:
+        pred_x: 4-D tensor, [batch_size, cell_size, cell_size, 9]
+        pred_y: 4-D tensor, [batch_size, cell_size, cell_size, 9]
+        gt_coord: 2-D tensor, [batch_size, 18]
+        gt_index  : 2-D tensor, [batch_size, 2]
+    Return:
+        mean distance with shape [batch, cell_size, cell_size, 9]
+    """
+    for i in range(cfg.BATCH_SIZE):
+        gt_idx = tf.cast(gt_index[i], tf.float32)
+
+    #gt_x = tf.concat([gt_coord[0]+])
+    shape = x1.get_shape()
+    alpha = tf.constant(cfg.ALPHA, dtype=tf.float32)
+    output = np.zeros([cfg.BATCH_SIZE, shape[1], shape[2], 1])
+    dth_in_cell_size = tf.constant(cfg.Dth, dtype=tf.float32)
+    one = tf.ones([cfg.BATCH_SIZE, 9], dtype=tf.float32)
+
+    output1, output2, output3 = [], [], []
+    for i in range(cfg.BATCH_SIZE):
+        for j in range(shape[1]):
+            for k in range(shape[2]):
+                pred     = x1[i,j,k,:] # [18,]
+                gt       = x2[i] # [18, ]
+                index    = [j, k]
+                pred_idx = tf.cast(index, tf.float32)
+                gt_idx   = tf.cast(gt_index[i], tf.float32)
+
+                # compute delta-x, delta-y. shape: [18]
+                temp     = tf.stack([pred[0] +pred_idx[0]-gt[0] -gt_idx[0],  pred[1]+pred_idx[1]-gt[1] -gt_idx[1],
+                                     pred[2] +pred_idx[0]-gt[2] -gt_idx[0],  pred[3]+pred_idx[1]-gt[3] -gt_idx[1],
+                                     pred[4] +pred_idx[0]-gt[4] -gt_idx[0],  pred[5]+pred_idx[1]-gt[5] -gt_idx[1],
+                                     pred[6] +pred_idx[0]-gt[6] -gt_idx[0],  pred[7]+pred_idx[1]-gt[7] -gt_idx[1],
+                                     pred[8] +pred_idx[0]-gt[8] -gt_idx[0],  pred[9]+pred_idx[1]-gt[9] -gt_idx[1],
+                                     pred[10]+pred_idx[0]-gt[10]-gt_idx[0], pred[11]+pred_idx[1]-gt[11]-gt_idx[1],
+                                     pred[12]+pred_idx[0]-gt[12]-gt_idx[0], pred[13]+pred_idx[1]-gt[13]-gt_idx[1],
+                                     pred[14]+pred_idx[0]-gt[14]-gt_idx[0], pred[15]+pred_idx[1]-gt[15]-gt_idx[1],
+                                     pred[16]+pred_idx[0]-gt[16]-gt_idx[0], pred[17]+pred_idx[1]-gt[17]-gt_idx[1]])
+                temp     = 32 * temp  # in pixel size
+                temp     = tf.square(temp)
+                temp_x   = tf.stack([temp[0], temp[2], temp[4], temp[6], temp[8], temp[10], temp[12], temp[14], temp[16]])
+                temp_y   = tf.stack([temp[1], temp[3], temp[5], temp[7], temp[9], temp[11], temp[13], temp[15], temp[17]])
+                temp     = tf.sqrt(temp_x + temp_y)
+
+                # if number in x <= dth_in_cell_size, the position in temp would be 1.0,
+                # otherwise(x > dth_int_cell_size) would be 0
+                mask = tf.cast(temp <= dth_in_cell_size, tf.float32)
+
+                confidence = (tf.exp(alpha * (one - temp / dth_in_cell_size)) - one) / ((tf.exp(alpha) - one) + cfg.EPSILON)
+
+                # if distance in x bigger than threshold, value calculated will be negtive,
+                # use below to make the negtive to 0
+                confidence = tf.multiply(confidence, mask)
+                confidence = tf.reduce_mean(confidence)
+
+                output3.append(confidence)
+            output3 = tf.convert_to_tensor(output3)
+            output2.append(output3)
+            output3 = []
+        output2 = tf.convert_to_tensor(output2)
+        output1.append(output2)
+        output2 = []
+    output1 = tf.convert_to_tensor(output1)
+
+    return output
+
 def get_max_index(confidence):
     """
     confidence: 2-D tensor [cell_size, cell_size]
@@ -149,120 +218,6 @@ def get_max_index(confidence):
     maxi = int_idx[0][0]
     maxj = int_idx[0][1]
     return maxi, maxj
-
-def confidence_thresh(cscs, predicts, threshold=cfg.CONF_THRESHOLD):
-    """
-    decide in predicts which to be pruned by threshold through cscs.
-    Args:
-        cscs: class-specific confidence score  with shape: [cell_size, cell_size, 1]
-        predicts: output coord tensor(convert to numpy)  with shape: [cell_size, cell_size, 18]
-        threshold: conf_thresh, defined in config.py
-    Return:
-        output: a numpy feature tensor with shape: [cell_size, cell_size, 18]
-    """
-    out_tensor = np.ones_like(cscs, dtype=np.float32)  # initialize out_tensor
-    out_tensor[cscs <= threshold] = 0
-    out_tensor = np.tile(out_tensor, [1, 1, predicts.shape[2]])  # expand out_tensor to the shape of predicts
-    out_tensor = np.multiply(out_tensor, predicts) # multiply element-wise, when outtensor number is 0 means it will be pruned
-    return out_tensor
-
-def nms(input_tensor, cscs):
-    """
-    get the maximum confidence value to response
-    Args:
-        input_tensor: output_tensor from confidence_thresh with shape: [cell_size, cell_size, 18]
-        cscs: class-specific confidence score with shape: [cell_size, cell_size, 1]
-    Return:
-        a numpy feature tensor with shape: [cell_size, cell_size, 18]
-    """
-    res = np.zeros_like(cscs, dtype=np.float32)
-    max_idx = np.argmax(cscs)
-    col, row = divmod(max_idx, 13)
-    row -= 1
-    res[col, row, :] = 1
-    res = np.tile(res, [1, 1, input_tensor.shape[2]])
-    output = np.multiply(res, input_tensor)
-    return output
-
-def nms33(input_tensor, cscs):
-    """
-    get the maximum confidence score tensor from confidence_thresh
-    Args:
-        cscs: class-specific confidence score with shape: [cell_size, cell_size, 1]
-        input_tensor: out_tensor from confidence_thresh with shape: [cell_size, cell_size, 18]
-    Return:
-        output: a numpy feature tensor with shape: [cell_size, cell_size, 18]
-    """
-    res = np.zeros_like(cscs, dtype=np.float32)
-    for i in range(1, input_tensor.shape[0]-1, 2):
-        for j in range(1, input_tensor.shape[1]-1, 2):
-            temp = cscs[i-1:i+2, j-1:j+2, :]
-            temp_max = np.argmax(temp)
-            k, l, __ = np.where(temp == temp_max)
-            #k, l = k[0], l[0]
-            res[k+i-1, l+j-1, :] = 1
-    res = np.tile(res, [1, 1, input_tensor.shape[2]])
-    out_tensor = np.multiply(res, input_tensor)
-    return out_tensor
-
-
-def get_region_boxes(output, num_classes):
-    """
-    Return a list which elements are coordinates of all boxes
-    Args:
-        output: 3-D tensor with shape [cell, cell, 19+num_classes]
-        num_classes:
-    Return:
-        A list
-    """
-    anchor_num = 1
-
-    h, w, d = output.shape[0], output.shape[1], output.shape[2]
-    output_coord = output[:, :, :18]
-    output_cls   = output[:, :, 18:-1]
-    output_confs = output[:, :, -1].reshape(h, w, 1)
-
-    output_coord = np.concatenate([sigmoid_func(output_coord[:, :, :2]), output_coord[:, :, 2:]], 2)
-    output_confs = sigmoid_func(output_confs)
-    output_cls = softmax(output_cls)
-
-    boxes = []
-    for i in range(h):
-        for j in range(w):
-            max_conf = -1
-            if output_confs[i][j][0] == 0:
-                continue
-            else:
-                xc = output_coord[i][j][0] + j
-                yc = output_coord[i][j][1] + i
-                x1 = output_coord[i][j][2] + j
-                y1 = output_coord[i][j][3] + i
-                x2 = output_coord[i][j][4] + j
-                y2 = output_coord[i][j][5] + i
-                x3 = output_coord[i][j][6] + j
-                y3 = output_coord[i][j][7] + i
-                x4 = output_coord[i][j][8] + j
-                y4 = output_coord[i][j][9] + i
-                x5 = output_coord[i][j][10] + j
-                y5 = output_coord[i][j][11] + i
-                x6 = output_coord[i][j][12] + j
-                y6 = output_coord[i][j][13] + i
-                x7 = output_coord[i][j][14] + j
-                y7 = output_coord[i][j][15] + i
-                x8 = output_coord[i][j][16] + j
-                y8 = output_coord[i][j][17] + i
-                output_conf = output_confs[i][j][0]
-                if max_conf < output_conf:
-                    max_conf = output_conf
-                    max_idi, max_idj = i, j
-                cls_max_conf = np.max(output_cls[i][j])
-                cls_max_id, = np.where(output_cls[i][j] == cls_max_conf)
-                cls_max_id = cls_max_id[0]
-            box = [xc/13, yc/13, x1/13, y1/13, x2/13, y2/13, x3/13, y3/13, x4/13, y4/13, x5/13, y5/13, x6/13, y6/13, x7/13, y7/13, x8/13, y8/13,
-                    output_conf, cls_max_conf, cls_max_id]
-            boxes.append(box)
-
-    return boxes
 
 def get_predict_boxes(output, num_classes):
     h, w, _ = output.shape[0], output.shape[1], output.shape[2]
@@ -297,30 +252,6 @@ def get_predict_boxes(output, num_classes):
     box = [xc/13, yc/13, x1/13, y1/13, x2/13, y2/13, x3/13, y3/13, x4/13, y4/13,
            x5/13, y5/13, x6/13, y6/13, x7/13, y7/13, x8/13, y8/13]
     return box
-
-
-def corner_confidence9(gt_corners, pr_corners, th=80, sharpness=2, im_width=640, im_height=480):
-    ''' gt_corners: Ground-truth 2D projections of the 3D bounding box corners, shape: (18,) type: list
-        pr_corners: Prediction for the 2D projections of the 3D bounding box corners, shape: (18,), type: list
-        th        : distance threshold, type: int
-        sharpness : sharpness of the exponential that assigns a confidence value to the distance
-        -----------
-        return    : a list of shape (9,) with 9 confidence values
-    '''
-    dist = np.subtract(gt_corners, pr_corners)
-    dist = dist.reshape(9, 2)
-    dist[:, 0] = dist[:, 0] * im_width
-    dist[:, 1] = dist[:, 1] * im_height
-
-    eps = 1e-5
-    dist  = np.sqrt(np.sum((dist)**2, axis=1))
-    mask  = (dist < th)
-    conf  = np.exp(sharpness * (1.0 - dist/th)) - 1
-    conf0 = np.exp(np.array([sharpness])) - 1 + eps
-    conf  = conf / conf0.repeat(18).reshape(9,1)
-    # conf = 1.0 - dist/th
-    conf  = mask * conf
-    return np.mean(conf)
 
 def calcAngularDistance(gt_rot, pr_rot):
     rotDiff = np.dot(gt_rot, np.transpose(pr_rot))
