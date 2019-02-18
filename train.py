@@ -85,7 +85,7 @@ class Solver(object):
 
         self.learning_rate = tf.train.piecewise_constant(self.global_step, boundaries, learning_rate, name='learning_rate')
         # self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(
-           # self.net.total_loss, global_step=self.global_step)
+           # self.net.total_loss[0], global_step=self.global_step)
         self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate).minimize(
             self.net.total_loss[0], global_step=self.global_step)
         self.ema = tf.train.ExponentialMovingAverage(decay=0.999)
@@ -142,6 +142,9 @@ class Solver(object):
                             train_timer.remain(step, self.max_iter))
                         print("=======================================================================")
                         print(log_str)
+
+                        if loss[0] > 10000:
+                            break
 
                         # test
                         # self.test()
