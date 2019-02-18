@@ -49,7 +49,7 @@ class Solver(object):
         self.batch_size = cfg.BATCH_SIZE
         self.epoch = cfg.EPOCH
         self.weight_file = cfg.WEIGHTS_FILE  # data/weights/
-        self.cache_file  = cfg.CACHE_DIR
+        self.cache_file  = cfg.CACHE_FILE
         self.max_iter = int(len(data.imgname) / self.batch_size)
         self.inital_learning_rate = cfg.LEARNING_RATE  # 0.001
         self.decay_steps = cfg.DECAY_STEP
@@ -146,6 +146,7 @@ class Solver(object):
                         print(log_str)
 
                         if loss[0] < best_loss:
+                            print('best loss!')
                             self.saver.save(self.sess, self.cache_file)
                             global_step = self.global_step
                             best_loss = loss[0]
