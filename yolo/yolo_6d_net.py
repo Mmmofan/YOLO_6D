@@ -194,25 +194,6 @@ class YOLO6D_net:
         """
         with tf.variable_scope(scope):
 
-            ## Predicts
-            predict_conf = tf.reshape(predicts[:, :, :, -1], [self.Batch_Size, self.cell_size, self.cell_size, 1])  # get predicted confidence
-            pred_tensor = []  # restore tensor
-            # get the max confidence tensor and its index
-            for i in range(self.Batch_Size):
-                pred_conf = predict_conf[i]
-                pred_conf = tf.reshape(pred_conf, [self.cell_size, self.cell_size])
-                pred_i, pred_j = get_max_index(pred_conf)
-                temp_tensor = predicts[i, pred_i, pred_j, :]
-                pred_tensor.append(temp_tensor)
-            pred_tensor = tf.convert_to_tensor(pred_tensor)  # shape: [batch, 32], store tensors with max_confidence
-            # metric
-            predict_centroids = pred_tensor[:, :2*self.boxes_per_cell]
-            predict_corners   = pred_tensor[:, 2*self.boxes_per_cell:self.boundry_1]
-            predict_coord_tr  = tf.concat([tf.nn.sigmoid(predict_centroids), predict_corners], 1)
-            predict_classes   = pred_tensor[:, self.boundry_1:-1]
-            predict_boxes_tr  = tf.concat([tf.nn.sigmoid(predicts[:,:,:,:2]), predicts[:,:,:,2:self.boundry_1]], 3)
-
-
             ## Ground Truth
             response = tf.reshape(labels[:, :, :, 0], [self.Batch_Size, self.cell_size, self.cell_size, 1])
             gt_tensor = []
@@ -230,6 +211,28 @@ class YOLO6D_net:
             #metric
             labels_coord   = gt_tensor[:, 1:self.boundry_1+1]
             labels_classes = gt_tensor[:, self.boundry_1+1: ]
+
+
+            ## Predicts
+            predict_conf = tf.reshape(predicts[:, :, :, -1], [self.Batch_Size, self.cell_size, self.cell_size, 1])  # get predicted confidence
+            pred_tensor = []  # restore tensor
+            # get the max confidence tensor and its index
+            for i in range(self.Batch_Size):
+                #pred_conf = predict_conf[i]
+                #pred_conf = tf.reshape(pred_conf, [self.cell_size, self.cell_size])
+                #pred_i, pred_j = get_max_index(pred_conf)
+
+                pred_i, pred_j = gt_index[i][0], gt_index[i][1]
+
+                temp_tensor = predicts[i, pred_i, pred_j, :]
+                pred_tensor.append(temp_tensor)
+            pred_tensor = tf.convert_to_tensor(pred_tensor)  # shape: [batch, 32], store tensors with max_confidence
+            # metric
+            predict_centroids = pred_tensor[:, :2*self.boxes_per_cell]
+            predict_corners   = pred_tensor[:, 2*self.boxes_per_cell:self.boundry_1]
+            predict_coord_tr  = tf.concat([tf.nn.sigmoid(predict_centroids), predict_corners], 1)
+            predict_classes   = pred_tensor[:, self.boundry_1:-1]
+            predict_boxes_tr  = tf.concat([tf.nn.sigmoid(predicts[:,:,:,:2]), predicts[:,:,:,2:self.boundry_1]], 3)
 
 
             ## offset

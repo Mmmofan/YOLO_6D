@@ -62,6 +62,7 @@ class Detector(object):
             feed_dict    = {self.yolo.input_images: input_image}
             output       = self.sess.run(self.yolo.logit, feed_dict=feed_dict)
             self.post_process(output, image_path, i)
+        return
 
     def post_process(self, input, image_path, number):
         coords = input[:, :, :, :18]
@@ -76,7 +77,7 @@ class Detector(object):
             conf = confs[i]
             idxi, idxj = np.where(conf == np.max(conf))
             idxi, idxj = idxi[0], idxj[0]
-            idxi, idxj = 5, 4
+            #idxi, idxj = 5, 4
             classes = class_prob[i,idxi,idxj,:]
             classes = softmax(classes)
             class_id = np.where(classes==np.max(classes))
