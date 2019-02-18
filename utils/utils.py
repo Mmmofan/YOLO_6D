@@ -54,7 +54,7 @@ def softmax(X, theta = 1.0, axis = None):
     if len(X.shape) == 1: p = p.flatten()
     return p
 
-def softmax_cross_entropy(logit, label, weights):
+def softmax_cross_entropy(label, logit, weights):
     """
     logit: output [B, classes]
     label: ground truth [B, classes]
@@ -66,11 +66,12 @@ def softmax_cross_entropy(logit, label, weights):
 
     logit = tf.exp(logit)
     logit_sum = tf.reduce_sum(logit, 1, keep_dims=True)
-    logit_sum = tf.tile(logit_sum, [1, logit_shape[1]])
+    logit_sum = tf.tile(logit_sum, (1, logit_shape[1]))
     softmax = tf.divide(logit, logit_sum)
+    weights = tf.tile(weights, (1, label_shape[1]))
 
     cross_entropy_loss = tf.multiply(tf.reduce_sum(-1.0 * label * tf.log(softmax), 1, keep_dims=True), weights)
-    cross_entropy_loss = tf.abs(tf.reduce_sum(cross_entropy_loss))
+    cross_entropy_loss = tf.reduce_sum(cross_entropy_loss)
 
     return cross_entropy_loss
 
@@ -153,6 +154,10 @@ def confidence9(pred_x, pred_y, gt_x, gt_y):
     dth_in_cell_size = tf.constant(cfg.Dth, dtype=tf.float32)
     one = tf.ones_like(pred_x, dtype=tf.float32)
 
+    pred_x = pred_x * 32
+    pred_y = pred_y * 32
+    gt_x   = gt_x   * 32
+    gt_y   = gt_y   * 32
     dist_x = tf.square(pred_x - gt_x)
     dist_y = tf.square(pred_y - gt_y)
     dist   = tf.sqrt(dist_x + dist_y)
