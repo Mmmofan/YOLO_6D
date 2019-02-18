@@ -148,8 +148,6 @@ class Linemod(object):
         bg[mask == 255] = 0
         res = obj + bg
 
-        cv2.imwrite("replaced.jpg", res)
-        #res = cv2.cvtColor(res, cv2.COLOR_BGR2RGB).astype(np.float32)
         res = (res / 255.0) * 2.0 - 1.0
 
         if flipped:

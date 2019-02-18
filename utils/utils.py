@@ -84,61 +84,11 @@ def mean_squared_error(logit, label, weights):
     logit_shape = logit.get_shape()
     label_shape = label.get_shape()
     assert(logit_shape == label_shape)
-    # logit_mean = tf.reduce_mean(logit, 3, keep_dims=True)
-    # logit_mean = tf.tile(logit_mean, [1, 1, 1, logit_shape[3]])
     diff = tf.squared_difference(logit, label)
     diff_mean = tf.reduce_mean(diff, len(logit_shape)-1, keep_dims=True)
     error = tf.multiply(diff_mean, weights)
     error = tf.reduce_sum(error)
     return error
-
-def confidence_func(x):
-    """
-    Args:
-        x: a 4-D tensor: [Batch_size, cell, cell, 18]
-        compute confidence score then concat to original
-    Returns:
-        a 4-D tensor: [Batch_Size, cell, cell, 18]
-    """
-    alpha = tf.constant(cfg.ALPHA, dtype=tf.float32)
-    dth_in_cell_size = tf.constant(cfg.Dth, dtype=tf.float32)
-    one = tf.ones_like(x, dtype=tf.float32)
-
-    # if number in x <= dth_in_cell_size, the position in temp would be 1.0,
-    # otherwise(x > dth_int_cell_size) would be 0
-    temp = tf.cast(x <= dth_in_cell_size, tf.float32)
-
-    confidence = (tf.exp(alpha * (one - x / dth_in_cell_size)) - one) / (tf.exp(alpha) - one)
-
-    # if distance in x bigger than threshold, value calculated will be negtive,
-    # use below to make the negtive to 0
-    confidence = tf.multiply(confidence, temp)
-
-    confidence = tf.reduce_mean(confidence, 3, keep_dims=True)
-
-    return confidence
-
-def dist(x1, x2):
-    """
-    Args:
-        x1: 4-D tensor, [batch_size, cell, cell, 18]
-        x2: 4-D tensor, [batch_size, cell, cell, 18]
-    Return:
-    """
-    # make x1, x2 in pixel size
-    x1, x2 = x1 * 32, x2 * 32
-    # delta x-square, y-square, in pixel level
-    diff = tf.squared_difference(x1, x2)
-    # sqrt(delta x-square + delta y-square)
-    predict_x = tf.stack([diff[:,:,:,0], diff[:,:,:,2], diff[:,:,:,4], diff[:,:,:,6],
-                          diff[:,:,:,8], diff[:,:,:,10], diff[:,:,:,12], diff[:,:,:,14], diff[:,:,:,16]], 3)
-    predict_y = tf.stack([diff[:,:,:,1], diff[:,:,:,3], diff[:,:,:,5], diff[:,:,:,7],
-                          diff[:,:,:,9], diff[:,:,:,11], diff[:,:,:,13], diff[:,:,:,15], diff[:,:,:,17]], 3)
-
-    # compute distance in pixel level
-    distance = tf.sqrt(tf.add(predict_x, predict_y))
-
-    return distance
 
 def confidence9(pred_x, pred_y, gt_x, gt_y):
     """

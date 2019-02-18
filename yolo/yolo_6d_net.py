@@ -256,37 +256,9 @@ class YOLO6D_net:
                 pred_tensor.append(temp_tensor)
             pred_tensor = tf.convert_to_tensor(pred_tensor)  # shape: [batch, 32], store tensors with max_confidence
             # metric
-            #predict_centroids = pred_tensor[:, :2]
-            #predict_corners   = pred_tensor[:, 2:self.boundry_1]
-            #predict_coord_tr  = tf.concat([tf.nn.sigmoid(predict_centroids), predict_corners], 1)
             predict_coord_tr  = pred_tensor[:, :self.boundry_1]
             predict_classes   = pred_tensor[:, self.boundry_1:-1]
 
-
-            ## offset
-            
-
-            # offset for ground true
-            # ground_true_boxes_x = []
-            # ground_true_boxes_y = []
-            # for i in range(self.Batch_Size):
-                # gt_idx       = gt_index[i]
-                # idx_x, idx_y = tf.cast(gt_idx[0], dtype=tf.float32), tf.cast(gt_idx[1], dtype=tf.float32)
-                # off_set_x    = tf.tile(tf.reshape(idx_x, (1,1)), (1,9))
-                # off_set_y    = tf.tile(tf.reshape(idx_y, (1,1)), (1,9))
-                # temp         = gt_tensor[i]
-                # gt_x         = tf.reshape(tf.stack([temp[0], temp[2], temp[4], temp[6], temp[8],
-                                         # temp[10], temp[12], temp[14], temp[16]]), (1, -1))
-                # gt_y         = tf.reshape(tf.stack([temp[1], temp[3], temp[5], temp[7], temp[9],
-                                         # temp[11], temp[13], temp[15], temp[17]]), (1, -1))
-                # box_x        = off_set_x + gt_x
-                # box_y        = off_set_y + gt_y
-                # gt_box_x     = tf.tile(tf.reshape((box_x), (1, 1, 9)), (13, 13, 1))
-                # gt_box_y     = tf.tile(tf.reshape((box_y), (1, 1, 9)), (13, 13, 1))
-                # ground_true_boxes_x.append(gt_box_x)
-                # ground_true_boxes_y.append(gt_box_y)
-            # ground_true_boxes_x = tf.convert_to_tensor(ground_true_boxes_x)
-            # ground_true_boxes_y = tf.convert_to_tensor(ground_true_boxes_y)
 
             gt_x = tf.stack([labels_coord[:,0], labels_coord[:,2], labels_coord[:,4], labels_coord[:,6],
                              labels_coord[:,8], labels_coord[:,10], labels_coord[:,12], labels_coord[:,14], labels_coord[:,16]])
@@ -319,9 +291,7 @@ class YOLO6D_net:
             class_loss = softmax_cross_entropy(labels_classes, predict_classes, weights=class_coef)
 
             loss = conf_loss + coord_loss + class_loss
-            # tf.losses.add_loss(coord_loss)
-            # tf.losses.add_loss(conf_loss)
-            # tf.losses.add_loss(class_loss)
+
             total_loss = []
             total_loss.append(loss)
             total_loss.append(conf_loss)
