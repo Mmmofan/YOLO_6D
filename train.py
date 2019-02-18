@@ -87,7 +87,7 @@ class Solver(object):
         # self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(
            # self.net.total_loss, global_step=self.global_step)
         self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate).minimize(
-            self.net.total_loss, global_step=self.global_step)
+            self.net.total_loss[0], global_step=self.global_step)
         self.ema = tf.train.ExponentialMovingAverage(decay=0.999)
         self.averages_op = self.ema.apply(tf.trainable_variables())
         with tf.control_dependencies([self.optimizer]):
@@ -130,13 +130,13 @@ class Solver(object):
                         train_timer.toc()
 
                         log_str = ('\n   {}, Epoch:{}, Step:{}, Learning rate:{},\n'
-                            '   Loss: {:5.3f},\n   Speed: {:.3f}s/iter,'
-                            ' Load: {:.3f}s/iter, Remain: {}').format(
+                                   '   Loss: {:5.3f}, conf_loss: {:5.3f}, coord_loss: {:5.3f}, class_loss: {:5.3f},\n '
+                                   '   Speed: {:.3f}s/iter, Load: {:.3f}s/iter, Remain: {}').format(
                             datetime.datetime.now().strftime('%m/%d %H:%M:%S'),
                             epoch,
                             int(step),
                             round(self.learning_rate.eval(session=self.sess), 6),
-                            loss,
+                            loss[0], loss[1], loss[2], loss[3],
                             train_timer.average_time,
                             load_timer.average_time,
                             train_timer.remain(step, self.max_iter))

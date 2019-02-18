@@ -70,10 +70,10 @@ class YOLO6D_net:
         self.logit = self._build_net(self.input_images)
 
         if is_training:
-            # self.total_loss = self.loss_layer(self.logit, self.labels)
-            self.loss_layer(self.logit, self.labels)
-            self.total_loss = tf.losses.get_total_loss()
-            tf.summary.scalar('Total loss', self.total_loss)
+            self.total_loss = self.loss_layer(self.logit, self.labels)
+            # self.loss_layer(self.logit, self.labels)
+            # self.total_loss = tf.losses.get_total_loss()
+            tf.summary.tensor_summary('Total loss', self.total_loss)
 
 
     def _build_net(self, input):
@@ -239,12 +239,12 @@ class YOLO6D_net:
             off_set_x  = np.transpose(off_set_y, (1, 0, 2))
             off_set_x  = np.tile(np.transpose(np.reshape(off_set_x, (13, 13, 9, 1)), (3, 0, 1, 2)), (4, 1, 1, 1))
             off_set_y  = np.tile(np.transpose(np.reshape(off_set_y, (13, 13, 9, 1)), (3, 0, 1, 2)), (4, 1, 1, 1))
-            predict__x = tf.transpose(tf.stack([predict_boxes_tr[:,:,:,0], predict_boxes_tr[:,:,:,2], predict_boxes_tr[:,:,:,4], 
-                                                predict_boxes_tr[:,:,:,6], predict_boxes_tr[:,:,:,8], predict_boxes_tr[:,:,:,10], 
+            predict__x = tf.transpose(tf.stack([predict_boxes_tr[:,:,:,0], predict_boxes_tr[:,:,:,2], predict_boxes_tr[:,:,:,4],
+                                                predict_boxes_tr[:,:,:,6], predict_boxes_tr[:,:,:,8], predict_boxes_tr[:,:,:,10],
                                                 predict_boxes_tr[:,:,:,12], predict_boxes_tr[:,:,:,14], predict_boxes_tr[:,:,:,16]]),
                                                 (1,2,3,0))
-            predict__y = tf.transpose(tf.stack([predict_boxes_tr[:,:,:,1], predict_boxes_tr[:,:,:,3], predict_boxes_tr[:,:,:,5], 
-                                                predict_boxes_tr[:,:,:,7], predict_boxes_tr[:,:,:,9], predict_boxes_tr[:,:,:,11], 
+            predict__y = tf.transpose(tf.stack([predict_boxes_tr[:,:,:,1], predict_boxes_tr[:,:,:,3], predict_boxes_tr[:,:,:,5],
+                                                predict_boxes_tr[:,:,:,7], predict_boxes_tr[:,:,:,9], predict_boxes_tr[:,:,:,11],
                                                 predict_boxes_tr[:,:,:,13], predict_boxes_tr[:,:,:,15], predict_boxes_tr[:,:,:,17]]),
                                                 (1,2,3,0))
             pred_box_x = predict__x + off_set_x
@@ -260,9 +260,9 @@ class YOLO6D_net:
                 off_set_x    = tf.tile(tf.reshape(idx_x, (1,1)), (1,9))
                 off_set_y    = tf.tile(tf.reshape(idx_y, (1,1)), (1,9))
                 temp         = gt_tensor[i]
-                gt_x         = tf.reshape(tf.stack([temp[0], temp[2], temp[4], temp[6], temp[8], 
+                gt_x         = tf.reshape(tf.stack([temp[0], temp[2], temp[4], temp[6], temp[8],
                                          temp[10], temp[12], temp[14], temp[16]]), (1, -1))
-                gt_y         = tf.reshape(tf.stack([temp[1], temp[3], temp[5], temp[7], temp[9], 
+                gt_y         = tf.reshape(tf.stack([temp[1], temp[3], temp[5], temp[7], temp[9],
                                          temp[11], temp[13], temp[15], temp[17]]), (1, -1))
                 box_x        = off_set_x + gt_x
                 box_y        = off_set_y + gt_y
@@ -296,10 +296,16 @@ class YOLO6D_net:
 
             class_loss = softmax_cross_entropy(labels_classes, predict_classes, weights=class_coef)
 
-            # loss = conf_loss + coord_loss + class_loss
-            tf.losses.add_loss(coord_loss)
-            tf.losses.add_loss(conf_loss)
-            tf.losses.add_loss(class_loss)
+            loss = conf_loss + coord_loss + class_loss
+            # tf.losses.add_loss(coord_loss)
+            # tf.losses.add_loss(conf_loss)
+            # tf.losses.add_loss(class_loss)
+            total_loss = []
+            total_loss.append(loss)
+            total_loss.append(conf_loss)
+            total_loss.append(coord_loss)
+            total_loss.append(class_loss)
+            return total_loss
 
 
     def confidence_score(self, predicts, confidence):
