@@ -63,10 +63,11 @@ def softmax_cross_entropy(label, logit, weights):
     logit_shape = logit.get_shape()
     label_shape = label.get_shape()
     assert(logit_shape == label_shape)
+    epsilon = tf.constant(cfg.EPSILON, dtype=tf.float32)
 
     logit = tf.exp(logit)
     logit_sum = tf.reduce_sum(logit, 1, keep_dims=True)
-    logit_sum = tf.tile(logit_sum, (1, logit_shape[1]))
+    logit_sum = tf.tile(logit_sum, (1, logit_shape[1])) + epsilon
     softmax = tf.divide(logit, logit_sum)
     weights = tf.tile(weights, (1, label_shape[1]))
 
@@ -111,7 +112,7 @@ def confidence9(pred_x, pred_y, gt_x, gt_y):
     dist_x = tf.square(pred_x - gt_x)
     dist_y = tf.square(pred_y - gt_y)
     dist   = tf.sqrt(dist_x + dist_y)
-    
+
     # if number in x <= dth_in_cell_size, the position in temp would be 1.0,
     # otherwise(x > dth_int_cell_size) would be 0
     temp = tf.cast(dist <= dth_in_cell_size, tf.float32)

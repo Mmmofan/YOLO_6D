@@ -49,6 +49,7 @@ class Solver(object):
         self.batch_size = cfg.BATCH_SIZE
         self.epoch = cfg.EPOCH
         self.weight_file = cfg.WEIGHTS_FILE  # data/weights/
+        self.cache_file  = cfg.CACHE_DIR
         self.max_iter = int(len(data.imgname) / self.batch_size)
         self.inital_learning_rate = cfg.LEARNING_RATE  # 0.001
         self.decay_steps = cfg.DECAY_STEP
@@ -84,10 +85,10 @@ class Solver(object):
             learning_rate = [0.001, 0.0001, 0.001, 0.0001, 0.00001]
 
         self.learning_rate = tf.train.piecewise_constant(self.global_step, boundaries, learning_rate, name='learning_rate')
-        # self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(
-           # self.net.total_loss[0], global_step=self.global_step)
-        self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate).minimize(
-            self.net.total_loss[0], global_step=self.global_step)
+        self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(
+           self.net.total_loss[0], global_step=self.global_step)
+        # self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate).minimize(
+            # self.net.total_loss[0], global_step=self.global_step)
         self.ema = tf.train.ExponentialMovingAverage(decay=0.999)
         self.averages_op = self.ema.apply(tf.trainable_variables())
         with tf.control_dependencies([self.optimizer]):
@@ -112,6 +113,7 @@ class Solver(object):
         load_timer = Timer()
 
         epoch = 0
+        best_loss = 1e8
         while epoch <= self.epoch:
             for step in range(0, self.max_iter-1):
                 load_timer.tic()
@@ -143,6 +145,10 @@ class Solver(object):
                         print("=======================================================================")
                         print(log_str)
 
+                        if loss[0] < best_loss:
+                            self.saver.save(self.sess, self.cache_file)
+                            global_step = self.global_step
+                            best_loss = loss[0]
                         if loss[0] > 10000:
                             break
 
@@ -180,6 +186,7 @@ class Solver(object):
             self.data.batch = 0
 
         print('\n   Save final checkpoint file to: {}'.format(self.weight_file))
+        print(' min loss step: {} '.format(global_step))
         self.saver.save(self.sess, self.weight_file, global_step=self.global_step)
 
 

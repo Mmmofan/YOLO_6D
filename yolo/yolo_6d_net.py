@@ -196,7 +196,7 @@ class YOLO6D_net:
 
             ## Ground Truth
             response = tf.reshape(labels[:, :, :, 0], [self.Batch_Size, self.cell_size, self.cell_size, 1])
-            
+
             gt_tensor = []
             gt_index = []
             # get the responsible tensor's index
