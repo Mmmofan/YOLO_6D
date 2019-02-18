@@ -193,12 +193,12 @@ class YOLO6D_net:
                             last dimension: response(1) ==> coord(18) ==> classes(num_class) ==> confidence(1)
         """
         with tf.variable_scope(scope):
+
             ## Predicts
             predict_conf = tf.reshape(predicts[:, :, :, -1], [self.Batch_Size, self.cell_size, self.cell_size, 1])  # get predicted confidence
             # conf_mask = tf.zeros([self.Batch_Size, self.cell_size, self.cell_size, 1], dtype=tf.int32)
-            pred_tensor = []  # restore tensors
-
-            # get the max confidence tensor
+            pred_tensor = []  # restore tensor
+            # get the max confidence tensor and its index
             for i in range(self.Batch_Size):
                 pred_conf = predict_conf[i]
                 pred_conf = tf.reshape(pred_conf, [self.cell_size, self.cell_size])
@@ -219,8 +219,7 @@ class YOLO6D_net:
             response = tf.reshape(labels[:, :, :, 0], [self.Batch_Size, self.cell_size, self.cell_size, 1])
             gt_tensor = []
             gt_index = []
-
-            # get the responsible tensor
+            # get the responsible tensor's index
             for i in range(self.Batch_Size):
                 gt_resp = response[i]
                 gt_resp = tf.reshape(gt_resp, [self.cell_size, self.cell_size])
@@ -233,26 +232,50 @@ class YOLO6D_net:
 
             labels_coord   = gt_tensor[:, 1:self.boundry_1+1]
             labels_classes = gt_tensor[:, self.boundry_1+1: ]
-            labels_conf    = []
 
 
-            ## offset
-            off_set_y = np.tile(np.reshape(np.array([np.arange(13)] * 13 ), (13, 13, 1)), (1, 1, 9))
-            off_set_x = np.transpose(off_set_y, (1, 0, 2))
-            off_set_x = np.tile(np.transpose(np.reshape(off_set_x, (13, 13, 9, 1)), (3, 0, 1, 2)), (4, 1, 1, 1))
-            off_set_y = np.tile(np.transpose(np.reshape(off_set_y, (13, 13, 9, 1)), (3, 0, 1, 2)), (4, 1, 1, 1))
-            predict__x = tf.stack([predict_boxes_tr[:,:,:,0], predict_boxes_tr[:,:,:,2], predict_boxes_tr[:,:,:,4], 
-                                    predict_boxes_tr[:,:,:,6], predict_boxes_tr[:,:,:,8], predict_boxes_tr[:,:,:,10], 
-                                    predict_boxes_tr[:,:,:,12], predict_boxes_tr[:,:,:,14], predict_boxes_tr[:,:,:,16]])
-            predict__y = tf.stack([predict_boxes_tr[:,:,:,1], predict_boxes_tr[:,:,:,3], predict_boxes_tr[:,:,:,5], 
-                                    predict_boxes_tr[:,:,:,7], predict_boxes_tr[:,:,:,9], predict_boxes_tr[:,:,:,11], 
-                                    predict_boxes_tr[:,:,:,13], predict_boxes_tr[:,:,:,15], predict_boxes_tr[:,:,:,17]])
+            ## offset for predicts
+            off_set_y  = np.tile(np.reshape(np.array([np.arange(13)] * 13 ), (13, 13, 1)), (1, 1, 9))
+            off_set_x  = np.transpose(off_set_y, (1, 0, 2))
+            off_set_x  = np.tile(np.transpose(np.reshape(off_set_x, (13, 13, 9, 1)), (3, 0, 1, 2)), (4, 1, 1, 1))
+            off_set_y  = np.tile(np.transpose(np.reshape(off_set_y, (13, 13, 9, 1)), (3, 0, 1, 2)), (4, 1, 1, 1))
+            predict__x = tf.transpose(tf.stack([predict_boxes_tr[:,:,:,0], predict_boxes_tr[:,:,:,2], predict_boxes_tr[:,:,:,4], 
+                                                predict_boxes_tr[:,:,:,6], predict_boxes_tr[:,:,:,8], predict_boxes_tr[:,:,:,10], 
+                                                predict_boxes_tr[:,:,:,12], predict_boxes_tr[:,:,:,14], predict_boxes_tr[:,:,:,16]]),
+                                                (1,2,3,0))
+            predict__y = tf.transpose(tf.stack([predict_boxes_tr[:,:,:,1], predict_boxes_tr[:,:,:,3], predict_boxes_tr[:,:,:,5], 
+                                                predict_boxes_tr[:,:,:,7], predict_boxes_tr[:,:,:,9], predict_boxes_tr[:,:,:,11], 
+                                                predict_boxes_tr[:,:,:,13], predict_boxes_tr[:,:,:,15], predict_boxes_tr[:,:,:,17]]),
+                                                (1,2,3,0))
             pred_box_x = predict__x + off_set_x
             pred_box_y = predict__y + off_set_y
 
 
+            ## offset for ground true
+            ground_true_boxes_x = []
+            ground_true_boxes_y = []
+            for i in range(self.Batch_Size):
+                gt_idx       = gt_index[i]
+                idx_x, idx_y = tf.cast(gt_idx[0], dtype=tf.float32), tf.cast(gt_idx[1], dtype=tf.float32)
+                off_set_x    = tf.tile(tf.reshape(idx_x, (1,1)), (1,9))
+                off_set_y    = tf.tile(tf.reshape(idx_y, (1,1)), (1,9))
+                temp         = gt_tensor[i]
+                gt_x         = tf.reshape(tf.stack([temp[0], temp[2], temp[4], temp[6], temp[8], 
+                                         temp[10], temp[12], temp[14], temp[16]]), (1, -1))
+                gt_y         = tf.reshape(tf.stack([temp[1], temp[3], temp[5], temp[7], temp[9], 
+                                         temp[11], temp[13], temp[15], temp[17]]), (1, -1))
+                box_x        = off_set_x + gt_x
+                box_y        = off_set_y + gt_y
+                gt_box_x     = tf.tile(tf.reshape((box_x), (1, 1, 9)), (13, 13, 1))
+                gt_box_y     = tf.tile(tf.reshape((box_y), (1, 1, 9)), (13, 13, 1))
+                ground_true_boxes_x.append(gt_box_x)
+                ground_true_boxes_y.append(gt_box_y)
+            ground_true_boxes_x = tf.convert_to_tensor(ground_true_boxes_x)
+            ground_true_boxes_y = tf.convert_to_tensor(ground_true_boxes_y)
+
+
             ## Calculate confidence (instead of IoU like in YOLOv2)
-            labels_conf = confidence9(pred_box_x, pred_box_y, labels_coord, gt_index) # [batch, cell, cell, 1]
+            labels_conf = confidence9(pred_box_x, pred_box_y, ground_true_boxes_x, ground_true_boxes_y) # [batch, cell, cell, 1]
 
 
             ## Set coefs for loss
