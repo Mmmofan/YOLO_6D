@@ -68,6 +68,7 @@ class Solver(object):
         self.variable_to_save = tf.global_variables()
         self.restorer = tf.train.Saver(self.variable_to_restore, max_to_keep=3)
         self.saver = tf.train.Saver(self.variable_to_save, max_to_keep=3)
+        self.cacher = tf.train.Saver(self.variable_to_save, max_to_keep=3)
 
         self.ckpt_file = os.path.join(self.weight_file, 'yolo_6d.ckpt')
         self.summary_op = tf.summary.merge_all()
@@ -94,10 +95,11 @@ class Solver(object):
         with tf.control_dependencies([self.optimizer]):
             self.train_op = tf.group(self.averages_op)
 
-        gpu_options = tf.GPUOptions()
-        config = tf.ConfigProto(gpu_options=gpu_options)
+        # gpu_options = tf.GPUOptions()
+        # config = tf.ConfigProto(gpu_options=gpu_options)
 
-        self.sess = tf.Session(config=config)
+        # self.sess = tf.Session(config=config)
+        self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
 
         if self.weight_file is not None:
@@ -147,10 +149,9 @@ class Solver(object):
 
                         if loss[0] < best_loss:
                             print('best loss!')
-                            self.saver.save(self.sess, self.cache_file)
-                            global_step = self.global_step
+                            self.cacher.save(self.sess, self.cache_file)
                             best_loss = loss[0]
-                        if loss[0] > 10000:
+                        if loss[0] > 10000 or loss[0] is None:
                             break
 
                         # test
@@ -187,7 +188,6 @@ class Solver(object):
             self.data.batch = 0
 
         print('\n   Save final checkpoint file to: {}'.format(self.weight_file))
-        print(' min loss step: {} '.format(global_step))
         self.saver.save(self.sess, self.weight_file, global_step=self.global_step)
 
 
@@ -369,7 +369,7 @@ def main():
     parser.add_argument('--weights', default="yolo_6d.ckpt", type=str)
     parser.add_argument('--pre', default=False, type=bool)
     parser.add_argument('--data_dir', default="data", type=str)
-    parser.add_argument('--gpu', default='0', type=str)
+    parser.add_argument('--gpu', default='2', type=str)
     args = parser.parse_args()
 
     if len(args.datacfg) == 0:
