@@ -150,7 +150,7 @@ class Solver(object):
                             print('best loss!')
                             self.cacher.save(self.sess, self.cache_file)
                             best_loss = loss[0]
-                        if loss[0] > 10000 or loss[0] is None:
+                        if loss[0] > 10000 or loss[0] < -10000 or loss[0] is None:
                             break
 
                         # test
@@ -322,8 +322,8 @@ class Solver(object):
         acc = len(np.where(np.array(errs_2d) <= px_threshold)[0]) * 100. / (len(errs_2d)+eps)
         acc3d = len(np.where(np.array(errs_3d) <= self.vx_threshold)[0]) * 100. / (len(errs_3d)+eps)
         acc5cm5deg = len(np.where((np.array(errs_trans) <= 0.05) & (np.array(errs_angle) <= 5))[0]) * 100. / (len(errs_trans)+eps)
-        corner_acc = len(np.where(np.array(errs_corner2D) <= px_threshold)[0]) * 100. / (len(errs_corner2D)+eps)
-        mean_err_2d = np.mean(errs_2d)
+        # corner_acc = len(np.where(np.array(errs_corner2D) <= px_threshold)[0]) * 100. / (len(errs_corner2D)+eps)
+        # mean_err_2d = np.mean(errs_2d)
         mean_corner_err_2d = np.mean(errs_corner2D)
         nts = float(testing_samples)
         # Print test statistics
