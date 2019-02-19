@@ -60,48 +60,49 @@ class Detector(object):
             w, h, d      = image.shape[0], image.shape[1], image.shape[2]
             input_image  = np.reshape(image, [1, w, h, d])
             feed_dict    = {self.yolo.input_images: input_image}
-            output       = self.sess.run(self.yolo.logit, feed_dict=feed_dict)
+            output       = self.sess.run(self.yolo.logit, feed_dict=feed_dict)  # 4-D [1, 13, 13, 32]
             self.post_process(output, image_path, i)
         return
 
     def post_process(self, input, image_path, number):
         coords = input[:, :, :, :18]
         class_prob = input[:, :, :, 18:-1]
-        confidence = input[:, :, :, -1].reshape(-1,coords.shape[1],coords.shape[2], 1)
-        coords = np.concatenate([sigmoid_func(coords[:,:,:,:2]), coords[:,:,:,2:]], axis=3)
+        confidence = input[:, :, :, -1]
+        # coords = np.concatenate([sigmoid_func(coords[:,:,:,:2]), coords[:,:,:,2:]], axis=3)
         # class_prob = softmax(class_prob)
 
-        confs = confidence[:, :, :, -1]
         boxes = []
-        for i in range(confs.shape[0]):
-            conf = confs[i]
-            idxi, idxj = np.where(conf == np.max(conf))
+        for i in range(confidence.shape[0]):
+            conf = confidence[i]  # 2-D [13, 13]
+            max_conf = np.max(conf)
+            idxi, idxj = np.where(conf == max_conf)
             idxi, idxj = idxi[0], idxj[0]
             #idxi, idxj = 5, 4
-            classes = class_prob[i,idxi,idxj,:]
+            classes = class_prob[i, idxi, idxj, :]
             classes = softmax(classes)
-            class_id = np.where(classes==np.max(classes))
-            coord = coords[i, idxi, idxj, :].reshape(9,2)
-            xc = coord[0,0] + idxi
-            yc = coord[0,1] + idxj
-            x1 = coord[1,0] + idxi
-            y1 = coord[1,1] + idxj
-            x2 = coord[2,0] + idxi
-            y2 = coord[2,1] + idxj
-            x3 = coord[3,0] + idxi
-            y3 = coord[3,1] + idxj
-            x4 = coord[4,0] + idxi
-            y4 = coord[4,1] + idxj
-            x5 = coord[5,0] + idxi
-            y5 = coord[5,1] + idxj
-            x6 = coord[6,0] + idxi
-            y6 = coord[6,1] + idxj
-            x7 = coord[7,0] + idxi
-            y7 = coord[7,1] + idxj
-            x8 = coord[8,0] + idxi
-            y8 = coord[8,1] + idxj
-            box = [xc/13,yc/13,x1/13,y1/13,x2/13,y2/13,x3/13,y3/13,x4/13,y4/13,
-                    x5/13,y5/13,x6/13,y6/13,x7/13,y7/13,x8/13,y8/13,class_id]
+            max_id =np.max(classes)
+            class_id = np.where(classes==max_id)
+            coord = coords[i, idxi, idxj, :]
+            xc = coord[0]  + idxi
+            yc = coord[1]  + idxj
+            x1 = coord[2]  + idxi
+            y1 = coord[3]  + idxj
+            x2 = coord[4]  + idxi
+            y2 = coord[5]  + idxj
+            x3 = coord[6]  + idxi
+            y3 = coord[7]  + idxj
+            x4 = coord[8]  + idxi
+            y4 = coord[9]  + idxj
+            x5 = coord[10] + idxi
+            y5 = coord[11] + idxj
+            x6 = coord[12] + idxi
+            y6 = coord[13] + idxj
+            x7 = coord[14] + idxi
+            y7 = coord[15] + idxj
+            x8 = coord[16] + idxi
+            y8 = coord[17] + idxj
+            box = [xc*32.,yc*32.,x1*32.,y1*32.,x2*32.,y2*32.,x3*32.,y3*32.,x4*32.,y4*32.,
+                    x5*32.,y5*32.,x6*32.,y6*32.,x7*32.,y7*32.,x8*32.,y8*32.,class_id]
             boxes.append(box)
 
         for box in boxes:
@@ -111,11 +112,15 @@ class Detector(object):
 
     def draw(self, box, image_path, number):
         image = cv2.imread(image_path)
-        xc, yc, x1, y1, x2, y2, x3, y3, x4, y4 = int(box[0]*416), int(box[1]*416), int(box[2]*416), int(box[3]*416), int(box[4]*416), \
-                                                  int(box[5]*416), int(box[6]*416), int(box[7]*416), int(box[8]*416), int(box[9]*416)
-        x5, y5, x6, y6, x7, y7, x8, y8 = int(box[10]*416), int(box[11]*416), int(box[12]*416), int(box[13]*416), int(box[14]*416), int(box[15]*416), int(box[16]*416), int(box[17]*416)
+        xc, yc, x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6, x7, y7, x8, y8 = \
+                int(box[0]), int(box[1]), int(box[2]), int(box[3]), int(box[4]), int(box[5]), \
+                int(box[6]), int(box[7]), int(box[8]), int(box[9]), int(box[10]), int(box[11]),\
+                int(box[12]), int(box[13]), int(box[14]), int(box[15]), int(box[16]), int(box[17])
+        class_id = box[18][0][0]
+        assert(class_id>=0 and class_id<=13)
+        name = 'draw_' + str(number) + self.categories[class_id] + '.jpg'
 
-        cv2.circle(image, (xc, yc), 3, (255, 0, 0), 1)
+        cv2.circle(image, (xc, yc), 2, (255, 0, 0), 1)
         cv2.line(image, (x1, y1), (x3, y3), (255,0,0), 2)
         cv2.line(image, (x1, y1), (x5, y5), (255,0,0), 2)
         cv2.line(image, (x3, y3), (x7, y7), (255,0,0), 2)
@@ -125,23 +130,17 @@ class Detector(object):
         cv2.line(image, (x2, y2), (x6, y6), (0,255,0), 2)
         cv2.line(image, (x8, y8), (x4, y4), (0,255,0), 2)
         cv2.line(image, (x8, y8), (x6, y6), (0,255,0), 2)
-        name = 'draw' + str(number) + '.jpg'
         cv2.imwrite(name, image)
 
     def data_read(self, img, lbl):
-        image = self.image_read(img)
+        image = cv2.imread(img)
+        image = cv2.resize(image, (self.image_size, self.image_size))
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
+        image = (image / 255.0) * 2.0 - 1.0
+        
         label = self.label_read(lbl)
 
         return image, label
-
-    def image_read(self, imgname):
-        image = cv2.imread(imgname)
-        image = cv2.resize(image, (self.image_size, self.image_size))
-
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
-        image = (image / 255.0) * 2.0 - 1.0
-
-        return image
 
     def label_read(self, gt_labels):
 
