@@ -6,7 +6,7 @@ Training plan:
     1. pre-train on Linemod 'ape', set confidence mask coef = 0
     in author's repo, pre train has 80,200 batches with 32 batch size
     when batch size down to 8, pre train have to run 320,800 batches
-    in my implementation, run 200 epoches with batch size 8 (about 150 batches per epoch)   ### train 54 epoches
+    in my implementation, run 200 epoches with batch size 8 (about 150 batches per epoch)   ### Training
 
     2. train 'ape' ### 
 

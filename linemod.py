@@ -211,11 +211,11 @@ class Linemod(object):
         labels[response_x, response_y, 0] = 1.0
 
         # set coodinates value
-        #for i in range(1, 19, 1):
-        #    if i % 2 != 0: # x
-        #        labels[response_x, response_y, i] = coords[i - 1] - response_x
-        #    else: # y
-        #        labels[response_x, response_y, i] = coords[i - 1] - response_y
+        for i in range(1, 19, 1):
+            if i % 2 != 0: # x
+                labels[response_x, response_y, i] = coords[i - 1]
+            else: # y
+                labels[response_x, response_y, i] = coords[i - 1]
 
         # set label
         labels[response_x, response_y, 19 + int(gt_label)] = 1

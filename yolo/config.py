@@ -16,7 +16,7 @@ DISP = True
 ##Files parameters
 DATA_DIR = 'data'
 CACHE_DIR = os.path.join(DATA_DIR, 'cache')
-CACHE_FILE = os.path.join(CACHE_DIR, 'yolo_6d.ckpt')
+CACHE_FILE = os.path.join(CACHE_DIR, 'yolo_best.ckpt')
 OUTPUT_DIR = os.path.join(DATA_DIR, 'output')
 WEIGHTS_DIR = os.path.join(DATA_DIR, 'weights')
 WEIGHTS_FILE = os.path.join(WEIGHTS_DIR, 'yolo_6d.ckpt')
@@ -54,7 +54,7 @@ DECAY_STEP = 10000
 DECAY_RATE = 0.1
 STAIRCASE = True
 
-EPOCH = 700
+EPOCH = 200
 
 SUMMARY_ITER = 10
 SAVE_ITER = 50

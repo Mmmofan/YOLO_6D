@@ -213,6 +213,13 @@ class YOLO6D_net:
             labels_coord   = gt_tensor[:, 1:self.boundry_1+1]
             labels_classes = gt_tensor[:, self.boundry_1+1: ]
 
+            gt_x = tf.stack([labels_coord[:,0], labels_coord[:,2], labels_coord[:,4], labels_coord[:,6],
+                             labels_coord[:,8], labels_coord[:,10], labels_coord[:,12], labels_coord[:,14], labels_coord[:,16]])
+            gt_y = tf.stack([labels_coord[:,1], labels_coord[:,3], labels_coord[:,5], labels_coord[:,7],
+                             labels_coord[:,9], labels_coord[:,11], labels_coord[:,13], labels_coord[:,15], labels_coord[:,17]])
+            ground_true_boxes_x = tf.tile(tf.reshape(gt_x, (-1, 1, 1, 9)), (1, self.cell_size, self.cell_size, 1))
+            ground_true_boxes_y = tf.tile(tf.reshape(gt_y, (-1, 1, 1, 9)), (1, self.cell_size, self.cell_size, 1))
+
 
             ## Predicts
             predict_conf      = tf.reshape(predicts[:, :, :, -1], [self.Batch_Size, self.cell_size, self.cell_size, 1])  # get predicted confidence
@@ -246,26 +253,16 @@ class YOLO6D_net:
             pred_tensor = []  # restore tensor
             # get the max confidence tensor and its index
             for i in range(self.Batch_Size):
-                #pred_conf = predict_conf[i]
-                #pred_conf = tf.reshape(pred_conf, [self.cell_size, self.cell_size])
-                #pred_i, pred_j = get_max_index(pred_conf)
-
-                pred_i, pred_j = gt_index[i][0], gt_index[i][1]
-
+                pred_conf = predict_conf[i]
+                pred_conf = tf.reshape(pred_conf, [self.cell_size, self.cell_size])
+                pred_i, pred_j = get_max_index(pred_conf)
+                # pred_i, pred_j = gt_index[i][0], gt_index[i][1]
                 temp_tensor = pred_boxes[i, pred_i, pred_j, :]
                 pred_tensor.append(temp_tensor)
             pred_tensor = tf.convert_to_tensor(pred_tensor)  # shape: [batch, 32], store tensors with max_confidence
             # metric
             predict_coord_tr  = pred_tensor[:, :self.boundry_1]
             predict_classes   = pred_tensor[:, self.boundry_1:-1]
-
-
-            gt_x = tf.stack([labels_coord[:,0], labels_coord[:,2], labels_coord[:,4], labels_coord[:,6],
-                             labels_coord[:,8], labels_coord[:,10], labels_coord[:,12], labels_coord[:,14], labels_coord[:,16]])
-            gt_y = tf.stack([labels_coord[:,1], labels_coord[:,3], labels_coord[:,5], labels_coord[:,7],
-                             labels_coord[:,9], labels_coord[:,11], labels_coord[:,13], labels_coord[:,15], labels_coord[:,17]])
-            ground_true_boxes_x = tf.tile(tf.reshape(gt_x, (-1, 1, 1, 9)), (1, self.cell_size, self.cell_size, 1))
-            ground_true_boxes_y = tf.tile(tf.reshape(gt_y, (-1, 1, 1, 9)), (1, self.cell_size, self.cell_size, 1))
 
 
             ## Calculate confidence (instead of IoU like in YOLOv2)
@@ -276,17 +273,17 @@ class YOLO6D_net:
             object_coef   = tf.constant(self.obj_scale, dtype=tf.float32)
             noobject_coef = tf.constant(self.noobj_scale, dtype=tf.float32)
 
-            conf_coef     = tf.add(tf.ones_like(response)*noobject_coef, response*object_coef) # [batch. cell, cell, 1] with object:5.0, no object:0.1
-            coord_coef    = tf.ones([self.Batch_Size, 1]) * self.coord_scale
-            class_coef    = tf.ones([self.Batch_Size, 1]) * self.class_scale
+            conf_coef     = tf.add(tf.ones_like(response)*noobject_coef, response*object_coef) # [batch, cell, cell, 1] with object:5.0, no object:0.1
+            coord_coef    = tf.ones([self.Batch_Size, 1]) * self.coord_scale # [batch, 1]
+            class_coef    = tf.ones([self.Batch_Size, 1]) * self.class_scale # [batch, 1]
 
 
             ## Compute losses
             # conf_loss = tf.losses.mean_squared_error(self.confidence, predict_conf, weights=conf_coef, scope='Conf_Loss')
-            conf_loss = mean_squared_error(predict_conf, labels_conf, weights=conf_coef)
+            conf_loss = conf_mean_squared_error(predict_conf, labels_conf, weights=conf_coef)
 
             # coord_loss = tf.losses.mean_squared_error(labels_coord, predict_boxes_valid, weights=self.coord_scale, scope='Coord_Loss')
-            coord_loss = mean_squared_error(predict_coord_tr, labels_coord, weights=coord_coef)
+            coord_loss = coord_mean_squared_error(predict_coord_tr, labels_coord, weights=coord_coef)
 
             class_loss = softmax_cross_entropy(labels_classes, predict_classes, weights=class_coef)
 

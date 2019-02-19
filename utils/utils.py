@@ -9,6 +9,7 @@ import os
 
 import cv2
 import numpy as np
+import random
 import tensorflow as tf
 
 import yolo.config as cfg
@@ -76,11 +77,26 @@ def softmax_cross_entropy(label, logit, weights):
 
     return cross_entropy_loss
 
-def mean_squared_error(logit, label, weights):
+def conf_mean_squared_error(logit, label, weights):
     """
-    logit: output
-    label: ground truth
-    weights: coef
+    logit: output conf map  [batch, cell, cell, 1]
+    label: ground truth conf map [batch, cell, cell, 1]
+    weights: coef [batch, cell, cell, 1]
+    """
+    logit_shape = logit.get_shape()
+    label_shape = label.get_shape()
+    assert(logit_shape == label_shape)
+    diff = tf.squared_difference(logit, label)
+    diff_mean = tf.reduce_mean(diff, len(logit_shape)-1, keep_dims=True)
+    error = tf.multiply(diff_mean, weights)
+    error = tf.reduce_sum(error)
+    return error
+
+def coord_mean_squared_error(logit, label, weights):
+    """
+    logit: output coords  [batch, 18]
+    label: ground truth coords [batch, 18]
+    weights: coef [batch, 1]
     """
     logit_shape = logit.get_shape()
     label_shape = label.get_shape()
@@ -105,10 +121,10 @@ def confidence9(pred_x, pred_y, gt_x, gt_y):
     dth_in_cell_size = tf.constant(cfg.Dth, dtype=tf.float32)
     one = tf.ones_like(pred_x, dtype=tf.float32)
 
-    pred_x = pred_x * 32
-    pred_y = pred_y * 32
-    gt_x   = gt_x   * 32
-    gt_y   = gt_y   * 32
+    pred_x = pred_x * 32.0
+    pred_y = pred_y * 32.0
+    gt_x   = gt_x   * 32.0
+    gt_y   = gt_y   * 32.0
     dist_x = tf.square(pred_x - gt_x)
     dist_y = tf.square(pred_y - gt_y)
     dist   = tf.sqrt(dist_x + dist_y)
@@ -135,15 +151,21 @@ def get_max_index(confidence):
     max_val  = tf.reduce_max(confidence)
     bool_idx = tf.equal(confidence, max_val)
     int_idx  = tf.where(bool_idx)
-    maxi = int_idx[0][0]
-    maxj = int_idx[0][1]
+    if int_idx.get_shape()[0] > 1:
+        rand_num = random.randint(0, int_idx.get_shape()[0])
+        rand_idx = int_idx[rand_num]
+        maxi = rand_idx[0]
+        maxj = rand_idx[1]
+    else:
+        maxi = int_idx[0][0]
+        maxj = int_idx[0][1]
     return maxi, maxj
 
 def get_predict_boxes(output, num_classes):
     h, w, _ = output.shape[0], output.shape[1], output.shape[2]
     output_coord = output[:, :, :18]
     output_coord = np.concatenate([sigmoid_func(output_coord[:, :, :2]), output_coord[:, :, 2:]], 2)
-    output_cls   = output[:, :, 18:-1]
+    # output_cls   = output[:, :, 18:-1]
     output_conf  = output[:, :, -1]
 
     max_conf = np.max(output_conf)
