@@ -70,11 +70,10 @@ class Solver(object):
         self.saver = tf.train.Saver(self.variable_to_save, max_to_keep=3)
         self.cacher = tf.train.Saver(self.variable_to_save, max_to_keep=3)
 
-        self.ckpt_file = os.path.join(self.weight_file, 'yolo_6d.ckpt')
+        self.ckpt_file = os.path.join(self.weight_file, arg.weights)
         self.summary_op = tf.summary.merge_all()
         self.writer = tf.summary.FileWriter(self.output_dir, flush_secs=60)
 
-        #self.global_step = tf.get_variable('global_step', [], initializer=tf.constant_initializer(0.0), trainable=False)
         self.global_step = tf.Variable(0, name='global_step', trainable=False)
         # self.learning_rate = tf.train.exponential_decay(self.inital_learning_rate, self.global_step,
                                                         # self.decay_steps, self.decay_rate, self.staircase, name='learning_rate')
@@ -86,10 +85,10 @@ class Solver(object):
             learning_rate = [0.001, 0.0001, 0.001, 0.0001, 0.00001]
 
         self.learning_rate = tf.train.piecewise_constant(self.global_step, boundaries, learning_rate, name='learning_rate')
-        # self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(
-           # self.net.total_loss[0], global_step=self.global_step)
-        self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate).minimize(
-            self.net.total_loss[0], global_step=self.global_step)
+        self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(
+           self.net.total_loss[0], global_step=self.global_step)
+        # self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate).minimize(
+            # self.net.total_loss[0], global_step=self.global_step)
         self.ema = tf.train.ExponentialMovingAverage(decay=0.999)
         self.averages_op = self.ema.apply(tf.trainable_variables())
         with tf.control_dependencies([self.optimizer]):

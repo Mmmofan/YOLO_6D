@@ -161,7 +161,7 @@ def get_max_index(confidence):
     else:
         assert(int_idx.get_shape()[1]==2)
         maxi = int_idx[0, 0]
-        maxj = int_idx[0, 0]
+        maxj = int_idx[0, 1]
     return maxi, maxj
 
 def get_predict_boxes(output, num_classes):
