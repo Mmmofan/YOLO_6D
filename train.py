@@ -95,11 +95,10 @@ class Solver(object):
         with tf.control_dependencies([self.optimizer]):
             self.train_op = tf.group(self.averages_op)
 
-        # gpu_options = tf.GPUOptions()
-        # config = tf.ConfigProto(gpu_options=gpu_options)
+        gpu_options = tf.GPUOptions(allow_growth=True)
+        config = tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True)
 
-        # self.sess = tf.Session(config=config)
-        self.sess = tf.Session()
+        self.sess = tf.Session(config=config)
         self.sess.run(tf.global_variables_initializer())
 
         if self.weight_file is not None:
@@ -383,16 +382,18 @@ def main():
     if args.data_dir != cfg.DATA_DIR:
         update_config_paths(args.data_dir, args.weights)
 
-    os.environ['CUDA_VISABLE_DEVICES'] = args.gpu
+    gpu_device = '/gpu:' + args.gpu
+    # os.environ['CUDA_VISABLE_DEVICES'] = args.gpu
 
-    yolo = YOLO6D_net()
-    datasets = Linemod('train', arg=args.datacfg)
-    solver = Solver(yolo, datasets, arg=args)
+    with tf.device(gpu_device):
+        yolo = YOLO6D_net()
+        datasets = Linemod('train', arg=args.datacfg)
+        solver = Solver(yolo, datasets, arg=args)
 
-    print("\n-----------------------------start training----------------------------")
-    tic = time.clock()
-    solver.train()
-    toc = time.clock()
+        print("\n-----------------------------start training----------------------------")
+        tic = time.clock()
+        solver.train()
+        toc = time.clock()
     print("All training time: {}h".format((toc - tic) / 3600.0))
     print("------------------------------training end-----------------------------\n")
 
