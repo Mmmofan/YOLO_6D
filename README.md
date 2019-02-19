@@ -1,6 +1,8 @@
 # Yolo 6d (singleshotpose)
 Repoducibility of the following paper:
 
+mofan
+
 [Bugra Tekin, Sudipta N. Sinha and Pascal Fua, "Real-Time Seamless Single Shot 6D Object Pose Prediction", CVPR 2018.](https://arxiv.org/pdf/1711.08848.pdf)
 
 I'm still training it and didn't get the accuracy as the Pytoch version which provided by author. 
