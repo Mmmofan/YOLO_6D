@@ -16,6 +16,7 @@ DISP = True
 ##Files parameters
 DATA_DIR = 'data'
 CACHE_DIR = os.path.join(DATA_DIR, 'cache')
+CACHE_FILE = os.path.join(CACHE_DIR, 'yolo_best.ckpt')
 OUTPUT_DIR = os.path.join(DATA_DIR, 'output')
 WEIGHTS_DIR = os.path.join(DATA_DIR, 'weights')
 WEIGHTS_FILE = os.path.join(WEIGHTS_DIR, 'yolo_6d.ckpt')
@@ -42,9 +43,7 @@ NUM_COORD = 18
 
 BOXES_PER_CELL = 1
 CONF_OBJ_SCALE = 4.9
-# CONF_OBJ_SCALE = 0.0
 CONF_NOOBJ_SCALE = 0.1
-# CONF_NOOBJ_SCALE = 0.0
 CLASS_SCALE = 1.0
 COORD_SCALE = 1.0
 
@@ -55,7 +54,7 @@ DECAY_STEP = 10000
 DECAY_RATE = 0.1
 STAIRCASE = True
 
-EPOCH = 1000
+EPOCH = 200
 
 SUMMARY_ITER = 10
 SAVE_ITER = 50

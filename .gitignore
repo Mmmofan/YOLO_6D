@@ -20,6 +20,7 @@ __pycache__/
 *checkpoint*
 *.ckpt*
 *events*
+*.tfrecords
 
 
 

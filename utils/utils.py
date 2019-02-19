@@ -9,6 +9,7 @@ import os
 
 import cv2
 import numpy as np
+import random
 import tensorflow as tf
 
 import yolo.config as cfg
@@ -54,7 +55,7 @@ def softmax(X, theta = 1.0, axis = None):
     if len(X.shape) == 1: p = p.flatten()
     return p
 
-def softmax_cross_entropy(logit, label, weights):
+def softmax_cross_entropy(label, logit, weights):
     """
     logit: output [B, classes]
     label: ground truth [B, classes]
@@ -63,51 +64,76 @@ def softmax_cross_entropy(logit, label, weights):
     logit_shape = logit.get_shape()
     label_shape = label.get_shape()
     assert(logit_shape == label_shape)
+    epsilon = tf.constant(cfg.EPSILON, dtype=tf.float32)
 
     logit = tf.exp(logit)
     logit_sum = tf.reduce_sum(logit, 1, keep_dims=True)
-    logit_sum = tf.tile(logit_sum, [1, logit_shape[1]])
+    logit_sum = tf.tile(logit_sum, (1, logit_shape[1])) + epsilon
     softmax = tf.divide(logit, logit_sum)
+    weights = tf.tile(weights, (1, label_shape[1]))
 
     cross_entropy_loss = tf.multiply(tf.reduce_sum(-1.0 * label * tf.log(softmax), 1, keep_dims=True), weights)
-    cross_entropy_loss = tf.abs(tf.reduce_sum(cross_entropy_loss))
+    cross_entropy_loss = tf.reduce_sum(cross_entropy_loss)
 
     return cross_entropy_loss
 
-def mean_squared_error(logit, label, weights):
+def conf_mean_squared_error(logit, label, weights):
     """
-    logit: output
-    label: ground truth
-    weights: coef
+    logit: output conf map  [batch, cell, cell, 1]
+    label: ground truth conf map [batch, cell, cell, 1]
+    weights: coef [batch, cell, cell, 1]
     """
     logit_shape = logit.get_shape()
     label_shape = label.get_shape()
     assert(logit_shape == label_shape)
-    # logit_mean = tf.reduce_mean(logit, 3, keep_dims=True)
-    # logit_mean = tf.tile(logit_mean, [1, 1, 1, logit_shape[3]])
     diff = tf.squared_difference(logit, label)
     diff_mean = tf.reduce_mean(diff, len(logit_shape)-1, keep_dims=True)
     error = tf.multiply(diff_mean, weights)
     error = tf.reduce_sum(error)
     return error
 
-def confidence_func(x):
+def coord_mean_squared_error(logit, label, weights):
+    """
+    logit: output coords  [batch, 18]
+    label: ground truth coords [batch, 18]
+    weights: coef [batch, 1]
+    """
+    logit_shape = logit.get_shape()
+    label_shape = label.get_shape()
+    assert(logit_shape == label_shape)
+    diff = tf.squared_difference(logit, label)
+    diff_mean = tf.reduce_mean(diff, len(logit_shape)-1, keep_dims=True)
+    error = tf.multiply(diff_mean, weights)
+    error = tf.reduce_sum(error)
+    return error
+
+def confidence9(pred_x, pred_y, gt_x, gt_y):
     """
     Args:
-        x: a 4-D tensor: [Batch_size, cell, cell, 18]
-        compute confidence score then concat to original
-    Returns:
-        a 4-D tensor: [Batch_Size, cell, cell, 18]
+        pred_x: 4-D tensor, [batch_size, cell_size, cell_size, 9]
+        pred_y: 4-D tensor, [batch_size, cell_size, cell_size, 9]
+        gt_x  : 4-D tensor, [batch_size, cell_size, cell_size, 9]
+        gt_y  : 4-D tensor, [batch_size, cell_size, cell_size, 9]
+    Return:
+        confidence: [batch, cell_size, cell_size, 1]
     """
     alpha = tf.constant(cfg.ALPHA, dtype=tf.float32)
     dth_in_cell_size = tf.constant(cfg.Dth, dtype=tf.float32)
-    one = tf.ones_like(x, dtype=tf.float32)
+    one = tf.ones_like(pred_x, dtype=tf.float32)
+
+    pred_x = pred_x * 32.0
+    pred_y = pred_y * 32.0
+    gt_x   = gt_x   * 32.0
+    gt_y   = gt_y   * 32.0
+    dist_x = tf.square(pred_x - gt_x)
+    dist_y = tf.square(pred_y - gt_y)
+    dist   = tf.sqrt(dist_x + dist_y)
 
     # if number in x <= dth_in_cell_size, the position in temp would be 1.0,
     # otherwise(x > dth_int_cell_size) would be 0
-    temp = tf.cast(x <= dth_in_cell_size, tf.float32)
+    temp = tf.cast(dist <= dth_in_cell_size, tf.float32)
 
-    confidence = (tf.exp(alpha * (one - x / dth_in_cell_size)) - one) / (tf.exp(alpha) - one)
+    confidence = (tf.exp(alpha * (one - dist / dth_in_cell_size)) - one) / (tf.exp(alpha) - one + cfg.EPSILON)
 
     # if distance in x bigger than threshold, value calculated will be negtive,
     # use below to make the negtive to 0
@@ -117,113 +143,32 @@ def confidence_func(x):
 
     return confidence
 
-def dist(x1, x2):
-    """
-    Args:
-        x1: 4-D tensor, [batch_size, cell, cell, 18]
-        x2: 4-D tensor, [batch_size, cell, cell, 18]
-    Return:
-    """
-    # make x1, x2 in pixel size
-    x1, x2 = x1 * 32, x2 * 32
-    # delta x-square, y-square, in pixel level
-    diff = tf.squared_difference(x1, x2)
-    # sqrt(delta x-square + delta y-square)
-    predict_x = tf.stack([diff[:,:,:,0], diff[:,:,:,2], diff[:,:,:,4], diff[:,:,:,6],
-                          diff[:,:,:,8], diff[:,:,:,10], diff[:,:,:,12], diff[:,:,:,14], diff[:,:,:,16]], 3)
-    predict_y = tf.stack([diff[:,:,:,1], diff[:,:,:,3], diff[:,:,:,5], diff[:,:,:,7],
-                          diff[:,:,:,9], diff[:,:,:,11], diff[:,:,:,13], diff[:,:,:,15], diff[:,:,:,17]], 3)
-
-    # compute distance in pixel level
-    distance = tf.sqrt(tf.add(predict_x, predict_y))
-
-    return distance
-
-def confidence9(pred_x, pred_y, gt_coord, gt_index):
-    """
-    Args:
-        pred_x: 4-D tensor, [batch_size, cell_size, cell_size, 9]
-        pred_y: 4-D tensor, [batch_size, cell_size, cell_size, 9]
-        gt_coord: 2-D tensor, [batch_size, 18]
-        gt_index  : 2-D tensor, [batch_size, 2]
-    Return:
-        mean distance with shape [batch, cell_size, cell_size, 9]
-    """
-    for i in range(cfg.BATCH_SIZE):
-        gt_idx = tf.cast(gt_index[i], tf.float32)
-
-    #gt_x = tf.concat([gt_coord[0]+])
-    shape = x1.get_shape()
-    alpha = tf.constant(cfg.ALPHA, dtype=tf.float32)
-    output = np.zeros([cfg.BATCH_SIZE, shape[1], shape[2], 1])
-    dth_in_cell_size = tf.constant(cfg.Dth, dtype=tf.float32)
-    one = tf.ones([cfg.BATCH_SIZE, 9], dtype=tf.float32)
-
-    output1, output2, output3 = [], [], []
-    for i in range(cfg.BATCH_SIZE):
-        for j in range(shape[1]):
-            for k in range(shape[2]):
-                pred     = x1[i,j,k,:] # [18,]
-                gt       = x2[i] # [18, ]
-                index    = [j, k]
-                pred_idx = tf.cast(index, tf.float32)
-                gt_idx   = tf.cast(gt_index[i], tf.float32)
-
-                # compute delta-x, delta-y. shape: [18]
-                temp     = tf.stack([pred[0] +pred_idx[0]-gt[0] -gt_idx[0],  pred[1]+pred_idx[1]-gt[1] -gt_idx[1],
-                                     pred[2] +pred_idx[0]-gt[2] -gt_idx[0],  pred[3]+pred_idx[1]-gt[3] -gt_idx[1],
-                                     pred[4] +pred_idx[0]-gt[4] -gt_idx[0],  pred[5]+pred_idx[1]-gt[5] -gt_idx[1],
-                                     pred[6] +pred_idx[0]-gt[6] -gt_idx[0],  pred[7]+pred_idx[1]-gt[7] -gt_idx[1],
-                                     pred[8] +pred_idx[0]-gt[8] -gt_idx[0],  pred[9]+pred_idx[1]-gt[9] -gt_idx[1],
-                                     pred[10]+pred_idx[0]-gt[10]-gt_idx[0], pred[11]+pred_idx[1]-gt[11]-gt_idx[1],
-                                     pred[12]+pred_idx[0]-gt[12]-gt_idx[0], pred[13]+pred_idx[1]-gt[13]-gt_idx[1],
-                                     pred[14]+pred_idx[0]-gt[14]-gt_idx[0], pred[15]+pred_idx[1]-gt[15]-gt_idx[1],
-                                     pred[16]+pred_idx[0]-gt[16]-gt_idx[0], pred[17]+pred_idx[1]-gt[17]-gt_idx[1]])
-                temp     = 32 * temp  # in pixel size
-                temp     = tf.square(temp)
-                temp_x   = tf.stack([temp[0], temp[2], temp[4], temp[6], temp[8], temp[10], temp[12], temp[14], temp[16]])
-                temp_y   = tf.stack([temp[1], temp[3], temp[5], temp[7], temp[9], temp[11], temp[13], temp[15], temp[17]])
-                temp     = tf.sqrt(temp_x + temp_y)
-
-                # if number in x <= dth_in_cell_size, the position in temp would be 1.0,
-                # otherwise(x > dth_int_cell_size) would be 0
-                mask = tf.cast(temp <= dth_in_cell_size, tf.float32)
-
-                confidence = (tf.exp(alpha * (one - temp / dth_in_cell_size)) - one) / ((tf.exp(alpha) - one) + cfg.EPSILON)
-
-                # if distance in x bigger than threshold, value calculated will be negtive,
-                # use below to make the negtive to 0
-                confidence = tf.multiply(confidence, mask)
-                confidence = tf.reduce_mean(confidence)
-
-                output3.append(confidence)
-            output3 = tf.convert_to_tensor(output3)
-            output2.append(output3)
-            output3 = []
-        output2 = tf.convert_to_tensor(output2)
-        output1.append(output2)
-        output2 = []
-    output1 = tf.convert_to_tensor(output1)
-
-    return output
-
 def get_max_index(confidence):
     """
     confidence: 2-D tensor [cell_size, cell_size]
     return the index of maximum value of confidence
     """
+    assert(confidence.get_shape()[0]==13)
+    assert(confidence.get_shape()[1]==13)
     max_val  = tf.reduce_max(confidence)
     bool_idx = tf.equal(confidence, max_val)
     int_idx  = tf.where(bool_idx)
-    maxi = int_idx[0][0]
-    maxj = int_idx[0][1]
+    if int_idx.get_shape()[0] > 1:
+        rand_num = random.randint(0, int_idx.get_shape()[0])
+        rand_idx = int_idx[rand_num]
+        maxi = rand_idx[0]
+        maxj = rand_idx[1]
+    else:
+        assert(int_idx.get_shape()[1]==2)
+        maxi = int_idx[0, 0]
+        maxj = int_idx[0, 1]
     return maxi, maxj
 
 def get_predict_boxes(output, num_classes):
     h, w, _ = output.shape[0], output.shape[1], output.shape[2]
     output_coord = output[:, :, :18]
     output_coord = np.concatenate([sigmoid_func(output_coord[:, :, :2]), output_coord[:, :, 2:]], 2)
-    output_cls   = output[:, :, 18:-1]
+    # output_cls   = output[:, :, 18:-1]
     output_conf  = output[:, :, -1]
 
     max_conf = np.max(output_conf)

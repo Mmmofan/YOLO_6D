@@ -148,8 +148,6 @@ class Linemod(object):
         bg[mask == 255] = 0
         res = obj + bg
 
-        cv2.imwrite("replaced.jpg", res)
-        #res = cv2.cvtColor(res, cv2.COLOR_BGR2RGB).astype(np.float32)
         res = (res / 255.0) * 2.0 - 1.0
 
         if flipped:
@@ -215,9 +213,9 @@ class Linemod(object):
         # set coodinates value
         for i in range(1, 19, 1):
             if i % 2 != 0: # x
-                labels[response_x, response_y, i] = coords[i - 1] - response_x
+                labels[response_x, response_y, i] = coords[i - 1]
             else: # y
-                labels[response_x, response_y, i] = coords[i - 1] - response_y
+                labels[response_x, response_y, i] = coords[i - 1]
 
         # set label
         labels[response_x, response_y, 19 + int(gt_label)] = 1

@@ -49,6 +49,7 @@ class Solver(object):
         self.batch_size = cfg.BATCH_SIZE
         self.epoch = cfg.EPOCH
         self.weight_file = cfg.WEIGHTS_FILE  # data/weights/
+        self.cache_file  = cfg.CACHE_FILE
         self.max_iter = int(len(data.imgname) / self.batch_size)
         self.inital_learning_rate = cfg.LEARNING_RATE  # 0.001
         self.decay_steps = cfg.DECAY_STEP
@@ -67,12 +68,12 @@ class Solver(object):
         self.variable_to_save = tf.global_variables()
         self.restorer = tf.train.Saver(self.variable_to_restore, max_to_keep=3)
         self.saver = tf.train.Saver(self.variable_to_save, max_to_keep=3)
+        self.cacher = tf.train.Saver(self.variable_to_save, max_to_keep=3)
 
-        self.ckpt_file = os.path.join(self.weight_file, 'yolo_6d.ckpt')
+        self.ckpt_file = os.path.join(self.weight_file, arg.weights)
         self.summary_op = tf.summary.merge_all()
         self.writer = tf.summary.FileWriter(self.output_dir, flush_secs=60)
 
-        #self.global_step = tf.get_variable('global_step', [], initializer=tf.constant_initializer(0.0), trainable=False)
         self.global_step = tf.Variable(0, name='global_step', trainable=False)
         # self.learning_rate = tf.train.exponential_decay(self.inital_learning_rate, self.global_step,
                                                         # self.decay_steps, self.decay_rate, self.staircase, name='learning_rate')
@@ -84,17 +85,17 @@ class Solver(object):
             learning_rate = [0.001, 0.0001, 0.001, 0.0001, 0.00001]
 
         self.learning_rate = tf.train.piecewise_constant(self.global_step, boundaries, learning_rate, name='learning_rate')
-        # self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(
-           # self.net.total_loss, global_step=self.global_step)
-        self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate).minimize(
-            self.net.total_loss, global_step=self.global_step)
+        self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(
+           self.net.total_loss[0], global_step=self.global_step)
+        # self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate).minimize(
+            # self.net.total_loss[0], global_step=self.global_step)
         self.ema = tf.train.ExponentialMovingAverage(decay=0.999)
         self.averages_op = self.ema.apply(tf.trainable_variables())
         with tf.control_dependencies([self.optimizer]):
             self.train_op = tf.group(self.averages_op)
 
-        gpu_options = tf.GPUOptions()
-        config = tf.ConfigProto(gpu_options=gpu_options)
+        gpu_options = tf.GPUOptions(allow_growth=True)
+        config = tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True)
 
         self.sess = tf.Session(config=config)
         self.sess.run(tf.global_variables_initializer())
@@ -112,8 +113,9 @@ class Solver(object):
         load_timer = Timer()
 
         epoch = 0
+        best_loss = 1e8
         while epoch <= self.epoch:
-            for step in range(0, self.max_iter-1):
+            for step in range(1, self.max_iter-1):
                 load_timer.tic()
                 images, labels = self.data.next_batches()
                 load_timer.toc()
@@ -130,18 +132,25 @@ class Solver(object):
                         train_timer.toc()
 
                         log_str = ('\n   {}, Epoch:{}, Step:{}, Learning rate:{},\n'
-                            '   Loss: {:5.3f},\n   Speed: {:.3f}s/iter,'
-                            ' Load: {:.3f}s/iter, Remain: {}').format(
+                                   '   Loss: {:5.3f}, conf_loss: {:5.3f}, coord_loss: {:5.3f}, class_loss: {:5.3f},\n '
+                                   '   Speed: {:.3f}s/iter, Load: {:.3f}s/iter, Remain: {}').format(
                             datetime.datetime.now().strftime('%m/%d %H:%M:%S'),
                             epoch,
                             int(step),
                             round(self.learning_rate.eval(session=self.sess), 6),
-                            loss,
+                            loss[0], loss[1], loss[2], loss[3],
                             train_timer.average_time,
                             load_timer.average_time,
                             train_timer.remain(step, self.max_iter))
                         print("=======================================================================")
                         print(log_str)
+
+                        if loss[0] < best_loss:
+                            print('best loss!')
+                            self.cacher.save(self.sess, self.cache_file)
+                            best_loss = loss[0]
+                        if loss[0] > 10000 or loss[0] < -10000 or loss[0] is None:
+                            break
 
                         # test
                         # self.test()
@@ -312,8 +321,8 @@ class Solver(object):
         acc = len(np.where(np.array(errs_2d) <= px_threshold)[0]) * 100. / (len(errs_2d)+eps)
         acc3d = len(np.where(np.array(errs_3d) <= self.vx_threshold)[0]) * 100. / (len(errs_3d)+eps)
         acc5cm5deg = len(np.where((np.array(errs_trans) <= 0.05) & (np.array(errs_angle) <= 5))[0]) * 100. / (len(errs_trans)+eps)
-        corner_acc = len(np.where(np.array(errs_corner2D) <= px_threshold)[0]) * 100. / (len(errs_corner2D)+eps)
-        mean_err_2d = np.mean(errs_2d)
+        # corner_acc = len(np.where(np.array(errs_corner2D) <= px_threshold)[0]) * 100. / (len(errs_corner2D)+eps)
+        # mean_err_2d = np.mean(errs_2d)
         mean_corner_err_2d = np.mean(errs_corner2D)
         nts = float(testing_samples)
         # Print test statistics
@@ -358,7 +367,7 @@ def main():
     parser.add_argument('--weights', default="yolo_6d.ckpt", type=str)
     parser.add_argument('--pre', default=False, type=bool)
     parser.add_argument('--data_dir', default="data", type=str)
-    parser.add_argument('--gpu', default='0', type=str)
+    parser.add_argument('--gpu', default='2', type=str)
     args = parser.parse_args()
 
     if len(args.datacfg) == 0:
@@ -372,16 +381,18 @@ def main():
     if args.data_dir != cfg.DATA_DIR:
         update_config_paths(args.data_dir, args.weights)
 
-    os.environ['CUDA_VISABLE_DEVICES'] = args.gpu
+    gpu_device = '/gpu:' + args.gpu
+    # os.environ['CUDA_VISABLE_DEVICES'] = args.gpu
 
-    yolo = YOLO6D_net()
-    datasets = Linemod('train', arg=args.datacfg)
-    solver = Solver(yolo, datasets, arg=args)
+    with tf.device(gpu_device):
+        yolo = YOLO6D_net()
+        datasets = Linemod('train', arg=args.datacfg)
+        solver = Solver(yolo, datasets, arg=args)
 
-    print("\n-----------------------------start training----------------------------")
-    tic = time.clock()
-    solver.train()
-    toc = time.clock()
+        print("\n-----------------------------start training----------------------------")
+        tic = time.clock()
+        solver.train()
+        toc = time.clock()
     print("All training time: {}h".format((toc - tic) / 3600.0))
     print("------------------------------training end-----------------------------\n")
 
