@@ -148,6 +148,8 @@ def get_max_index(confidence):
     confidence: 2-D tensor [cell_size, cell_size]
     return the index of maximum value of confidence
     """
+    assert(confidence.get_shape()[0]==13)
+    assert(confidence.get_shape()[1]==13)
     max_val  = tf.reduce_max(confidence)
     bool_idx = tf.equal(confidence, max_val)
     int_idx  = tf.where(bool_idx)
@@ -157,8 +159,9 @@ def get_max_index(confidence):
         maxi = rand_idx[0]
         maxj = rand_idx[1]
     else:
-        maxi = int_idx[0][0]
-        maxj = int_idx[0][1]
+        assert(int_idx.get_shape()[1]==2)
+        maxi = int_idx[0, 0]
+        maxj = int_idx[0, 0]
     return maxi, maxj
 
 def get_predict_boxes(output, num_classes):

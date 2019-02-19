@@ -86,10 +86,10 @@ class Solver(object):
             learning_rate = [0.001, 0.0001, 0.001, 0.0001, 0.00001]
 
         self.learning_rate = tf.train.piecewise_constant(self.global_step, boundaries, learning_rate, name='learning_rate')
-        self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(
-           self.net.total_loss[0], global_step=self.global_step)
-        # self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate).minimize(
-            # self.net.total_loss[0], global_step=self.global_step)
+        # self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(
+           # self.net.total_loss[0], global_step=self.global_step)
+        self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate).minimize(
+            self.net.total_loss[0], global_step=self.global_step)
         self.ema = tf.train.ExponentialMovingAverage(decay=0.999)
         self.averages_op = self.ema.apply(tf.trainable_variables())
         with tf.control_dependencies([self.optimizer]):
@@ -116,7 +116,7 @@ class Solver(object):
         epoch = 0
         best_loss = 1e8
         while epoch <= self.epoch:
-            for step in range(0, self.max_iter-1):
+            for step in range(1, self.max_iter-1):
                 load_timer.tic()
                 images, labels = self.data.next_batches()
                 load_timer.toc()
