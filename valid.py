@@ -155,22 +155,24 @@ class Detector(object):
                 int(gt[6]), int(gt[7]), int(gt[8]), int(gt[9]), int(gt[10]), int(gt[11]),\
                 int(gt[12]), int(gt[13]), int(gt[14]), int(gt[15]), int(gt[16]), int(gt[17])
 
+        # draw predict box
         cv2.circle(image, (xc, yc), 2, (0, 0, 255), 2)
-        cv2.line(image, (x1, y1), (x3, y3), (0,0,255), 2)
-        cv2.line(image, (x1, y1), (x5, y5), (0,0,255), 2)
-        cv2.line(image, (x3, y3), (x7, y7), (0,0,255), 2)
-        cv2.line(image, (x5, y5), (x7, y7), (0,0,255), 2)
+        cv2.line(image, (x1, y1), (x3, y3), (0,0,255), 1)
+        cv2.line(image, (x1, y1), (x5, y5), (0,0,255), 1)
+        cv2.line(image, (x3, y3), (x7, y7), (0,0,255), 1)
+        cv2.line(image, (x5, y5), (x7, y7), (0,0,255), 1)
 
-        cv2.line(image, (x2, y2), (x4, y4), (0,0,255), 2)
-        cv2.line(image, (x2, y2), (x6, y6), (0,0,255), 2)
-        cv2.line(image, (x8, y8), (x4, y4), (0,0,255), 2)
-        cv2.line(image, (x8, y8), (x6, y6), (0,0,255), 2)
+        cv2.line(image, (x2, y2), (x4, y4), (0,0,255), 1)
+        cv2.line(image, (x2, y2), (x6, y6), (0,0,255), 1)
+        cv2.line(image, (x8, y8), (x4, y4), (0,0,255), 1)
+        cv2.line(image, (x8, y8), (x6, y6), (0,0,255), 1)
 
-        cv2.line(image, (x1, y1), (x2, y2), (0,0,255), 2)
-        cv2.line(image, (x3, y3), (x4, y4), (0,0,255), 2)
-        cv2.line(image, (x5, y5), (x6, y6), (0,0,255), 2)
-        cv2.line(image, (x7, y7), (x8, y8), (0,0,255), 2)
+        cv2.line(image, (x1, y1), (x2, y2), (0,0,255), 1)
+        cv2.line(image, (x3, y3), (x4, y4), (0,0,255), 1)
+        cv2.line(image, (x5, y5), (x6, y6), (0,0,255), 1)
+        cv2.line(image, (x7, y7), (x8, y8), (0,0,255), 1)
 
+        # draw gt box
         cv2.circle(image, (txc, tyc), 2, (0, 255, 0), 2)
         cv2.line(image, (tx1, ty1), (tx3, ty3), (0,255,0), 1)
         cv2.line(image, (tx1, ty1), (tx5, ty5), (0,255,0), 1)
@@ -186,6 +188,15 @@ class Detector(object):
         cv2.line(image, (tx3, ty3), (tx4, ty4), (0,255,0), 1)
         cv2.line(image, (tx5, ty5), (tx6, ty6), (0,255,0), 1)
         cv2.line(image, (tx7, ty7), (tx8, ty8), (0,255,0), 1)
+
+        # draw cell
+        """
+        for i in range(1, 13):
+            verti_x1 = int(640 / 13.0 * i)
+            hori_y1 = int(480/ 13.0 * i)
+            cv2.line(image, (verti_x1, 0), (verti_x1, 480), (0,255,0), 1)
+            cv2.line(image, (0, hori_y1), (640, hori_y1), (0,255,0), 1)
+        """
 
         font = cv2.FONT_HERSHEY_SIMPLEX
         text = 'center: (' + str(xc) + ',' + str(yc) + ').'
@@ -269,7 +280,8 @@ if __name__ == "__main__":
     weight_file = os.path.join(args.data_dir, args.weight_dir, args.weights)
 
     yolo = YOLO6D_net(is_training=False)
-    data = Linemod('train', args.datacfg)
+    #data = Linemod('train', args.datacfg)
+    data = Linemod('test', args.datacfg)
     detector = Detector(yolo, data, weight_file)
 
     detector.detect()
