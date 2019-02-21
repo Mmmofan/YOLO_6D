@@ -132,12 +132,13 @@ class YOLO6D_net:
         """
         Conv ==> Batch_Norm ==> Bias
         """
+        initializer = tf.contrib.layers.xavier_initializer()
         x_shape = x.get_shape()
         x_channels = x_shape[3].value
         weight_shape = [kernel_size, kernel_size, x_channels, filters]
         bias_shape = [filters]
         stride = [strides, strides, strides, strides]
-        weight = tf.Variable(tf.truncated_normal(weight_shape, stddev=0.1), name='weight') / (self.cell_size * self.cell_size)
+        weight = tf.Variable(initializer(weight_shape), name='weight') / (self.cell_size * self.cell_size)
         bias = tf.Variable(tf.constant(0.1, shape=bias_shape), name='biases') / (self.cell_size * self.cell_size)
 
         x = tf.nn.conv2d(x, weight, strides=stride, padding=pad, name=name)

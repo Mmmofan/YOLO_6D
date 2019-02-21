@@ -64,7 +64,7 @@ class Solver(object):
         if arg.pre == True:
             self.variable_to_restore = tf.global_variables()[:-2]
         else:
-            self.variable_to_restore = tf.global_variables()
+            self.variable_to_restore = tf.global_variables()[:-2]
         self.variable_to_save = tf.global_variables()
         self.restorer = tf.train.Saver(self.variable_to_restore, max_to_keep=3)
         self.saver = tf.train.Saver(self.variable_to_save, max_to_keep=3)
@@ -78,11 +78,11 @@ class Solver(object):
         # self.learning_rate = tf.train.exponential_decay(self.inital_learning_rate, self.global_step,
                                                         # self.decay_steps, self.decay_rate, self.staircase, name='learning_rate')
         if arg.pre:
-            boundaries = [1, 50, 1000, 2000]
-            learning_rate = [0.001, 0.0001, 0.001, 0.0001, 0.00001]
+            boundaries = cfg.PRE_BOUNDARIES
+            learning_rate = cfg.LEARNING_RATE
         else:
-            boundaries = [1, 50, 3000, 6000]
-            learning_rate = [0.001, 0.0001, 0.001, 0.0001, 0.00001]
+            boundaries = cfg.BOUNDARIES
+            learning_rate = cfg.LEARNING_RATE
 
         self.learning_rate = tf.train.piecewise_constant(self.global_step, boundaries, learning_rate, name='learning_rate')
         self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(
