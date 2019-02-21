@@ -48,7 +48,7 @@ class Solver(object):
         self.data = data
         self.batch_size = cfg.BATCH_SIZE
         self.epoch = cfg.EPOCH
-        self.weight_file = cfg.WEIGHTS_FILE  # data/weights/
+        self.weight_file = os.path.join(cfg.WEIGHTS_DIR, arg.weights)
         self.cache_file  = cfg.CACHE_FILE
         self.max_iter = int(len(data.imgname) / self.batch_size)
         self.inital_learning_rate = cfg.LEARNING_RATE  # 0.001

@@ -138,8 +138,8 @@ class YOLO6D_net:
         weight_shape = [kernel_size, kernel_size, x_channels, filters]
         bias_shape = [filters]
         stride = [strides, strides, strides, strides]
-        weight = tf.Variable(initializer(weight_shape), name='weight') / (self.cell_size * self.cell_size)
-        bias = tf.Variable(tf.constant(0.1, shape=bias_shape), name='biases') / (self.cell_size * self.cell_size)
+        weight = tf.Variable(initializer(weight_shape), name='weight')
+        bias = tf.Variable(tf.constant(1.0, shape=bias_shape), name='biases')
 
         x = tf.nn.conv2d(x, weight, strides=stride, padding=pad, name=name)
         if self.Batch_Norm:
