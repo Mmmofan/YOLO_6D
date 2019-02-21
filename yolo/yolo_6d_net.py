@@ -198,20 +198,17 @@ class YOLO6D_net:
             response = tf.reshape(labels[:, :, :, 0], [self.Batch_Size, self.cell_size, self.cell_size, 1])
 
             gt_tensor = []
-            gt_index = []
             # get the responsible tensor's index
             for i in range(self.Batch_Size):
                 gt_resp = response[i]
                 gt_resp = tf.reshape(gt_resp, [self.cell_size, self.cell_size])
                 gt_i, gt_j = get_max_index(gt_resp)
-                temp_tensor = labels[i, gt_i, gt_j, 1:]
+                temp_tensor = labels[i, gt_i, gt_j,:]
                 gt_tensor.append(temp_tensor)
-                gt_index.append([gt_i, gt_j])
             gt_tensor = tf.convert_to_tensor(gt_tensor)  # shape: [batch, 31], store object tensors
-            gt_index  = tf.convert_to_tensor(gt_index)   # shape: [batch, 2], store the coordinates of all ground true tensor
             #metric
-            labels_coord   = gt_tensor[:, :self.boundry_1]  # for later coord loss
-            labels_classes = gt_tensor[:, self.boundry_1: ]  # for later class loss
+            labels_coord   = gt_tensor[:, 1:self.boundry_1+1]  # for later coord loss
+            labels_classes = gt_tensor[:, self.boundry_1+1: ]  # for later class loss
 
             # gt_x = tf.stack([labels_coord[:,0], labels_coord[:,2], labels_coord[:,4], labels_coord[:,6],
             #                  labels_coord[:,8], labels_coord[:,10], labels_coord[:,12], labels_coord[:,14], labels_coord[:,16]])
