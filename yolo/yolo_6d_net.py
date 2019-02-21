@@ -110,16 +110,16 @@ class YOLO6D_net:
         x = self.conv(x, 3, 1, 1024, 'leaky', name='22_conv')
 
         x = self.conv(x, 3, 1, 1024, 'leaky', name='23_conv')
-        x = self.conv(x, 3, 1, 1024, 'leaky', name='24_conv')
+        x_24 = self.conv(x, 3, 1, 1024, 'leaky', name='24_conv')
 
-        x_ps = self.conv(x_16, 1, 1, 64, 'leaky', name='25_conv')
+        x_ps = self.conv(x_16, 1, 1, 64, 'leaky', name='26_conv')
         x_ps = self.reorg(x_ps)
 
-        x = tf.concat([x, x_ps], 3)
+        x = tf.concat([x_ps, x_24], 3)
 
-        x = self.conv(x, 3, 1, 1024, 'leaky', name='26_conv')
+        x = self.conv(x, 3, 1, 1024, 'leaky', name='29_conv')
         self.Batch_Norm = False
-        x = self.conv(x, 1, 1, 18 + 1 + self.num_class, 'linear', name='27_conv') ## 9 points 1 confidence C classes
+        x = self.conv(x, 1, 1, 18 + 1 + self.num_class, 'linear', name='30_conv') ## 9 points 1 confidence C classes
 
         if self.disp:
             print("----------Building network complete----------\n")
@@ -149,39 +149,27 @@ class YOLO6D_net:
             mean = tf.Variable(tf.ones([depth, ], dtype='float32'), name='rolling_mean')
             variance = tf.Variable(tf.ones([depth, ], dtype='float32'), name='rolling_variance')
 
-            x = tf.nn.batch_normalization(x, mean, variance, shift, scale, self.EPSILON)
-
-        x = tf.add(x, bias)
-
-        if self.Batch_Norm:
-            x = self.activation(x, activation)
+            x_bn = tf.nn.batch_normalization(x, mean, variance, shift, scale, self.EPSILON)
+            x = tf.add(x_bn, bias)
+            x = tf.maximum(0.1 * x, x)
+        else:
+            x = tf.add(x, bias)
 
         return x
 
     def max_pool_layer(self, x, name):
         return tf.nn.max_pool(x, ksize=[1,2,2,1], strides=[1,2,2,1], padding=self.MAX_PADDING, name=name)
 
-    def activation(self, x, activation_func, name='activation_func'):
-        if activation_func=='leaky':
-            return tf.nn.leaky_relu(x, alpha=0.1, name='leaky')
-        elif activation_func=='relu':
-            return tf.nn.relu(x, name='relu')
-        else:
-            return x
-
-    def reorg(self, x, strides=2):
+    def reorg(self, inputs):
         """
         Reorg the tensor(half the size, 4* the depth)
         """
-        x_shape = x.get_shape()
-        B, W, H, C = x_shape[0].value, x_shape[1].value, x_shape[2].value, x_shape[3].value
-        assert(W % strides == 0)
-        assert(H % strides == 0)
-        Ws = int(W / strides)
-        Hs = int(H / strides)
-        Cs = int(C * strides * strides)
-        x = tf.reshape(x, shape=[-1, Ws, Hs, Cs])
-        return x
+        outputs_1 = inputs[:, ::2, ::2, :]
+        outputs_2 = inputs[:, ::2, 1::2, :]
+        outputs_3 = inputs[:, 1::2, ::2, :]
+        outputs_4 = inputs[:, 1::2, 1::2, :]
+        output = tf.concat([outputs_1, outputs_2, outputs_3, outputs_4], axis = 3)
+        return output
 
 # ======================= Net definition end ===============================
 

@@ -56,60 +56,91 @@ class Detector(object):
         for i in range(10):
             image_path   = all_images[i]
             gt_label     = all_labels[i]
-            image, label = self.data_read(image_path, gt_label)
+            image, label = self.data_read(image_path, gt_label)  # image: [416, 416, 3], label: [13, 13, 32]
             w, h, d      = image.shape[0], image.shape[1], image.shape[2]
             input_image  = np.reshape(image, [1, w, h, d])
             feed_dict    = {self.yolo.input_images: input_image}
             output       = self.sess.run(self.yolo.logit, feed_dict=feed_dict)  # 4-D [1, 13, 13, 32]
-            self.post_process(output, image_path, i)
+            self.post_process(output, image_path, label, i)
         return
 
-    def post_process(self, output, image_path, number):
-        coords = output[:, :, :, :18] # [batch, 13, 13, 18]
-        class_prob = output[:, :, :, 18:-1]  # [batch, 13, 13, 13]
-        confidence = output[:, :, :, -1]  # [batch, 13, 13]
+    def post_process(self, output, image_path, label, number):
+        coords = output[:, :, :, 1:19] # [batch, 13, 13, 18]
+        class_prob = output[:, :, :, 19:]  # [batch, 13, 13, 13]
+        confidence = output[:, :, :, 1]  # [batch, 13, 13]
         coords = np.concatenate([sigmoid_func(coords[:,:,:,:2]), coords[:,:,:,2:]], axis=3)
         # class_prob = softmax(class_prob)
 
+        response = label[:, :, 0]
+        gt_coords = label[:, :, 1:19]
+        # gt_conf = self.confidence()
         boxes = []
+        gt = []
         for i in range(confidence.shape[0]):
             conf = confidence[i]  # 2-D [13, 13]
             max_conf = np.max(conf)
             idxi, idxj = np.where(conf == max_conf)
             idxi, idxj = idxi[0], idxj[0]
             classes = class_prob[i, idxi, idxj, :]
-            #classes = softmax(classes)
+            classes = softmax(classes)
             max_class_val= np.max(classes)
             class_id = np.where(classes==max_class_val)
             coord = coords[i, idxi, idxj, :]
-            xc = coord[0]  + idxi
-            yc = coord[1]  + idxj
-            x1 = coord[2]  + idxi
-            y1 = coord[3]  + idxj
-            x2 = coord[4]  + idxi
-            y2 = coord[5]  + idxj
-            x3 = coord[6]  + idxi
-            y3 = coord[7]  + idxj
-            x4 = coord[8]  + idxi
-            y4 = coord[9]  + idxj
-            x5 = coord[10] + idxi
-            y5 = coord[11] + idxj
-            x6 = coord[12] + idxi
-            y6 = coord[13] + idxj
-            x7 = coord[14] + idxi
-            y7 = coord[15] + idxj
-            x8 = coord[16] + idxi
-            y8 = coord[17] + idxj
-            box = [xc*32.,yc*32.,x1*32.,y1*32.,x2*32.,y2*32.,x3*32.,y3*32.,x4*32.,y4*32.,
-                    x5*32.,y5*32.,x6*32.,y6*32.,x7*32.,y7*32.,x8*32.,y8*32.,class_id]
+            xc = (coord[0]  + idxi) /13.
+            yc = (coord[1]  + idxj) /13.
+            x1 = (coord[2]  + idxi) /13.
+            y1 = (coord[3]  + idxj) /13.
+            x2 = (coord[4]  + idxi) /13.
+            y2 = (coord[5]  + idxj) /13.
+            x3 = (coord[6]  + idxi) /13.
+            y3 = (coord[7]  + idxj) /13.
+            x4 = (coord[8]  + idxi) /13.
+            y4 = (coord[9]  + idxj) /13.
+            x5 = (coord[10] + idxi) /13.
+            y5 = (coord[11] + idxj) /13.
+            x6 = (coord[12] + idxi) /13.
+            y6 = (coord[13] + idxj) /13.
+            x7 = (coord[14] + idxi) /13.
+            y7 = (coord[15] + idxj) /13.
+            x8 = (coord[16] + idxi) /13.
+            y8 = (coord[17] + idxj) /13.
+            box = [xc*640.,yc*480.,x1*640.,y1*480.,x2*640.,y2*480.,x3*640.,y3*480.,x4*640.,y4*480.,
+                    x5*640.,y5*480.,x6*640.,y6*480.,x7*640.,y7*480.,x8*640.,y8*480.,class_id]
             boxes.append(box)
 
-        for box in boxes:
-            self.draw(box, image_path, number)
+            resp = np.max(response)
+            respi, respj = np.where(response == resp)
+            respi, respj = respi[0], respj[0]
+            gt_coord = gt_coords[respi, respj, :]
+            txc = gt_coord[0] / 13.0
+            tyc = gt_coord[1] / 13.0
+            tx1 = gt_coord[2] / 13.0
+            ty1 = gt_coord[3] / 13.0
+            tx2 = gt_coord[4] / 13.0
+            ty2 = gt_coord[5] / 13.0
+            tx3 = gt_coord[6] / 13.0
+            ty3 = gt_coord[7] / 13.0
+            tx4 = gt_coord[8] / 13.0
+            ty4 = gt_coord[9] / 13.0
+            tx5 = gt_coord[10] / 13.0
+            ty5 = gt_coord[11] / 13.0
+            tx6 = gt_coord[12] / 13.0
+            ty6 = gt_coord[13] / 13.0
+            tx7 = gt_coord[14] / 13.0
+            ty7 = gt_coord[15] / 13.0
+            tx8 = gt_coord[16] / 13.0
+            ty8 = gt_coord[17] / 13.0
+            tbox = [txc*640, tyc*480, tx1*640, ty1*480, tx2*640, ty2*480, tx3*640, ty3*480, tx4*640, ty4*480, 
+                    tx5*640, ty5*480, tx6*640, ty6*480, tx7*640, ty7*480, tx8*640, ty8*480]
+            gt.append(tbox)
+
+        assert(len(boxes)==len(gt))
+        for idx in range(len(boxes)):
+            self.draw(boxes[idx], gt[idx], image_path, number)
 
         print('image showed')
 
-    def draw(self, box, image_path, number):
+    def draw(self, box, gt, image_path, number):
         image = cv2.imread(image_path)
         xc, yc, x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6, x7, y7, x8, y8 = \
                 int(box[0]), int(box[1]), int(box[2]), int(box[3]), int(box[4]), int(box[5]), \
@@ -119,7 +150,12 @@ class Detector(object):
         assert(class_id>=0 and class_id<=13)
         name = 'draw_' + str(number) + self.categories[class_id] + '.jpg'
 
-        cv2.circle(image, (xc, yc), 2, (255, 0, 0), 1)
+        txc, tyc, tx1, ty1, tx2, ty2, tx3, ty3, tx4, ty4, tx5, ty5, tx6, ty6, tx7, ty7, tx8, ty8 = \
+                int(gt[0]), int(gt[1]), int(gt[2]), int(gt[3]), int(gt[4]), int(gt[5]), \
+                int(gt[6]), int(gt[7]), int(gt[8]), int(gt[9]), int(gt[10]), int(gt[11]),\
+                int(gt[12]), int(gt[13]), int(gt[14]), int(gt[15]), int(gt[16]), int(gt[17])
+
+        cv2.circle(image, (xc, yc), 2, (0, 0, 255), 2)
         cv2.line(image, (x1, y1), (x3, y3), (0,0,255), 2)
         cv2.line(image, (x1, y1), (x5, y5), (0,0,255), 2)
         cv2.line(image, (x3, y3), (x7, y7), (0,0,255), 2)
@@ -135,9 +171,27 @@ class Detector(object):
         cv2.line(image, (x5, y5), (x6, y6), (0,0,255), 2)
         cv2.line(image, (x7, y7), (x8, y8), (0,0,255), 2)
 
+        cv2.circle(image, (txc, tyc), 2, (0, 255, 0), 2)
+        cv2.line(image, (tx1, ty1), (tx3, ty3), (0,255,0), 1)
+        cv2.line(image, (tx1, ty1), (tx5, ty5), (0,255,0), 1)
+        cv2.line(image, (tx3, ty3), (tx7, ty7), (0,255,0), 1)
+        cv2.line(image, (tx5, ty5), (tx7, ty7), (0,255,0), 1)
+
+        cv2.line(image, (tx2, ty2), (tx4, ty4), (0,255,0), 1)
+        cv2.line(image, (tx2, ty2), (tx6, ty6), (0,255,0), 1)
+        cv2.line(image, (tx8, ty8), (tx4, ty4), (0,255,0), 1)
+        cv2.line(image, (tx8, ty8), (tx6, ty6), (0,255,0), 1)
+
+        cv2.line(image, (tx1, ty1), (tx2, ty2), (0,255,0), 1)
+        cv2.line(image, (tx3, ty3), (tx4, ty4), (0,255,0), 1)
+        cv2.line(image, (tx5, ty5), (tx6, ty6), (0,255,0), 1)
+        cv2.line(image, (tx7, ty7), (tx8, ty8), (0,255,0), 1)
+
         font = cv2.FONT_HERSHEY_SIMPLEX
-        text = 'center: (' + str(xc) + ',' + str(yc) + ')'
+        text = 'center: (' + str(xc) + ',' + str(yc) + ').'
+        gt_text = 'gt:(' + str(txc) + ',' + str(tyc) + ')'
         image = cv2.putText(image, text, (20, 20), font, 0.6, (0,0,255), 1)
+        image = cv2.putText(image, gt_text, (20, 40), font, 0.6, (0,0,255), 1)
         cv2.imwrite(name, image)
 
     def data_read(self, img, lbl):
@@ -215,7 +269,7 @@ if __name__ == "__main__":
     weight_file = os.path.join(args.data_dir, args.weight_dir, args.weights)
 
     yolo = YOLO6D_net(is_training=False)
-    data = Linemod('test', args.datacfg)
+    data = Linemod('train', args.datacfg)
     detector = Detector(yolo, data, weight_file)
 
     detector.detect()
