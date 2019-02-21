@@ -119,25 +119,26 @@ def confidence9(pred_x, pred_y, gt_x, gt_y):
     """
     alpha = tf.constant(cfg.ALPHA, dtype=tf.float32)
     dth_in_cell_size = tf.constant(cfg.Dth, dtype=tf.float32)
-    one = tf.ones_like(pred_x, dtype=tf.float32)
+    one = tf.constant(1.0, dtype=tf.float32)
+    epsilon = tf.constant(cfg.EPSILON, dtype=tf.float32)
 
     pred_x = pred_x * 32.0
     pred_y = pred_y * 32.0
     gt_x   = gt_x   * 32.0
     gt_y   = gt_y   * 32.0
-    dist_x = tf.square(pred_x - gt_x)
-    dist_y = tf.square(pred_y - gt_y)
+    dist_x = tf.squared_difference(pred_x, gt_x)
+    dist_y = tf.squared_difference(pred_y, gt_y)
     dist   = tf.sqrt(dist_x + dist_y)
 
     # if number in x <= dth_in_cell_size, the position in temp would be 1.0,
     # otherwise(x > dth_int_cell_size) would be 0
     temp = tf.cast(dist <= dth_in_cell_size, tf.float32)
 
-    confidence = (tf.exp(alpha * (one - dist / dth_in_cell_size)) - one) / (tf.exp(alpha) - one + cfg.EPSILON)
+    confidence = (tf.exp(alpha * (one - dist / dth_in_cell_size)) - one) / (tf.exp(alpha) - one + epsilon)
 
     # if distance in x bigger than threshold, value calculated will be negtive,
     # use below to make the negtive to 0
-    confidence = tf.multiply(confidence, temp)
+    confidence = confidence * temp
 
     confidence = tf.reduce_mean(confidence, 3, keep_dims=True)
 
@@ -153,15 +154,9 @@ def get_max_index(confidence):
     max_val  = tf.reduce_max(confidence)
     bool_idx = tf.equal(confidence, max_val)
     int_idx  = tf.where(bool_idx)
-    if int_idx.get_shape()[0] > 1:
-        rand_num = random.randint(0, int_idx.get_shape()[0])
-        rand_idx = int_idx[rand_num]
-        maxi = rand_idx[0]
-        maxj = rand_idx[1]
-    else:
-        assert(int_idx.get_shape()[1]==2)
-        maxi = int_idx[0, 0]
-        maxj = int_idx[0, 1]
+    assert(int_idx.get_shape()[1]==2)
+    maxi = int_idx[0, 0]
+    maxj = int_idx[0, 1]
     return maxi, maxj
 
 def get_predict_boxes(output, num_classes):

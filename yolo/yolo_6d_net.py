@@ -204,26 +204,34 @@ class YOLO6D_net:
                 gt_resp = response[i]
                 gt_resp = tf.reshape(gt_resp, [self.cell_size, self.cell_size])
                 gt_i, gt_j = get_max_index(gt_resp)
-                temp_tensor = labels[i, gt_i, gt_j, :]
+                temp_tensor = labels[i, gt_i, gt_j, 1:]
                 gt_tensor.append(temp_tensor)
                 gt_index.append([gt_i, gt_j])
-            gt_tensor = tf.convert_to_tensor(gt_tensor)  # shape: [batch, 32], store object tensors
+            gt_tensor = tf.convert_to_tensor(gt_tensor)  # shape: [batch, 31], store object tensors
             gt_index  = tf.convert_to_tensor(gt_index)   # shape: [batch, 2], store the coordinates of all ground true tensor
             #metric
-            labels_coord   = gt_tensor[:, 1:self.boundry_1+1]
-            labels_classes = gt_tensor[:, self.boundry_1+1: ]
+            labels_coord   = gt_tensor[:, :self.boundry_1]  # for later coord loss
+            labels_classes = gt_tensor[:, self.boundry_1: ]  # for later class loss
 
-            gt_x = tf.stack([labels_coord[:,0], labels_coord[:,2], labels_coord[:,4], labels_coord[:,6],
-                             labels_coord[:,8], labels_coord[:,10], labels_coord[:,12], labels_coord[:,14], labels_coord[:,16]])
-            gt_y = tf.stack([labels_coord[:,1], labels_coord[:,3], labels_coord[:,5], labels_coord[:,7],
-                             labels_coord[:,9], labels_coord[:,11], labels_coord[:,13], labels_coord[:,15], labels_coord[:,17]])
-            ground_true_boxes_x = tf.tile(tf.reshape(gt_x, (-1, 1, 1, 9)), (1, self.cell_size, self.cell_size, 1))
-            ground_true_boxes_y = tf.tile(tf.reshape(gt_y, (-1, 1, 1, 9)), (1, self.cell_size, self.cell_size, 1))
+            # gt_x = tf.stack([labels_coord[:,0], labels_coord[:,2], labels_coord[:,4], labels_coord[:,6],
+            #                  labels_coord[:,8], labels_coord[:,10], labels_coord[:,12], labels_coord[:,14], labels_coord[:,16]])
+            # gt_y = tf.stack([labels_coord[:,1], labels_coord[:,3], labels_coord[:,5], labels_coord[:,7],
+            #                  labels_coord[:,9], labels_coord[:,11], labels_coord[:,13], labels_coord[:,15], labels_coord[:,17]])
+            # ground_true_boxes_x = tf.tile(tf.reshape(gt_x, (-1, 1, 1, 9)), (1, self.cell_size, self.cell_size, 1))
+            # ground_true_boxes_y = tf.tile(tf.reshape(gt_y, (-1, 1, 1, 9)), (1, self.cell_size, self.cell_size, 1))
+
+            gt_coords = labels[:, :, :, 1:self.boundry_1+1]  # [batch, cell, cell, 18]
+            ground_true_boxes_x = tf.stack([gt_coords[:,:,:,0], gt_coords[:,:,:,2], gt_coords[:,:,:,4], gt_coords[:,:,:,6],
+                                            gt_coords[:,:,:,8], gt_coords[:,:,:,10], gt_coords[:,:,:,12], gt_coords[:,:,:,14], gt_coords[:,:,:,16]])
+            ground_true_boxes_x = tf.transpose(ground_true_boxes_x, (1,2,3,0))  # for later conf calculate
+            ground_true_boxes_y = tf.stack([gt_coords[:,:,:,1], gt_coords[:,:,:,3], gt_coords[:,:,:,5], gt_coords[:,:,:,7],
+                                            gt_coords[:,:,:,9], gt_coords[:,:,:,11], gt_coords[:,:,:,13], gt_coords[:,:,:,15], gt_coords[:,:,:,17]])
+            ground_true_boxes_y = tf.transpose(ground_true_boxes_y, (1,2,3,0))  # for later conf calculate
 
 
             ## Predicts
-            predict_conf      = tf.reshape(predicts[:, :, :, -1], [self.Batch_Size, self.cell_size, self.cell_size, 1])  # get predicted confidence
-            predict_boxes_tr  = tf.concat([tf.nn.sigmoid(predicts[:,:,:,:2]), predicts[:,:,:,2:self.boundry_1]], 3)
+            predict_conf      = tf.reshape(predicts[:, :, :, 0], [self.Batch_Size, self.cell_size, self.cell_size, 1])  # get predicted confidence
+            predict_boxes_tr  = tf.concat([tf.nn.sigmoid(predicts[:,:,:,1:3]), predicts[:,:,:,3:self.boundry_1+1]], 3)
             # offset for predicts
             off_set_y  = np.tile(np.reshape(np.array([np.arange(13)] * 13 ), (13, 13, 1)), (1, 1, 9))
             off_set_x  = np.transpose(off_set_y, (1, 0, 2))
@@ -237,8 +245,8 @@ class YOLO6D_net:
                                                 predict_boxes_tr[:,:,:,7], predict_boxes_tr[:,:,:,9], predict_boxes_tr[:,:,:,11],
                                                 predict_boxes_tr[:,:,:,13], predict_boxes_tr[:,:,:,15], predict_boxes_tr[:,:,:,17]]),
                                                 (1,2,3,0))
-            pred_box_x = predict__x + off_set_x  # predict boxes x coordinates with offset
-            pred_box_y = predict__y + off_set_y  # predict boxes y coordinates with offset
+            pred_box_x = predict__x + off_set_x  # predict boxes x coordinates with offset, for later conf calculate
+            pred_box_y = predict__y + off_set_y  # predict boxes y coordinates with offset, for later conf calculate
             pred_boxes = tf.transpose(tf.stack([pred_box_x[:,:,:,0], pred_box_y[:,:,:,0],
                                                 pred_box_x[:,:,:,1], pred_box_y[:,:,:,1],
                                                 pred_box_x[:,:,:,2], pred_box_y[:,:,:,2],
@@ -247,8 +255,8 @@ class YOLO6D_net:
                                                 pred_box_x[:,:,:,5], pred_box_y[:,:,:,5],
                                                 pred_box_x[:,:,:,6], pred_box_y[:,:,:,6],
                                                 pred_box_x[:,:,:,7], pred_box_y[:,:,:,7],
-                                                pred_box_x[:,:,:,8], pred_box_y[:,:,:,8]]), (1,2,3,0))
-            pred_boxes = tf.concat([pred_boxes, predicts[:,:,:,18:]], 3)
+                                                pred_box_x[:,:,:,8], pred_box_y[:,:,:,8]]), (1,2,3,0))  # predict coords [batch, cell, cell, 18]
+            pred_boxes = tf.concat([pred_boxes, predicts[:,:,:,19:]], 3)  # [batch, cell, cell, 31], without confidence
 
             pred_tensor = []  # restore tensor
             # get the max confidence tensor and its index
@@ -259,10 +267,10 @@ class YOLO6D_net:
                 # pred_i, pred_j = gt_index[i][0], gt_index[i][1]
                 temp_tensor = pred_boxes[i, pred_i, pred_j, :]
                 pred_tensor.append(temp_tensor)
-            pred_tensor = tf.convert_to_tensor(pred_tensor)  # shape: [batch, 32], store tensors with max_confidence
+            pred_tensor = tf.convert_to_tensor(pred_tensor)  # shape: [batch, 31], store tensors with max_confidence
             # metric
-            predict_coord_tr  = pred_tensor[:, :self.boundry_1]
-            predict_classes   = pred_tensor[:, self.boundry_1:-1]
+            predict_coord_tr  = pred_tensor[:, :self.boundry_1]  # for later coord loss
+            predict_classes   = pred_tensor[:, self.boundry_1:]  # for later class loss
 
 
             ## Calculate confidence (instead of IoU like in YOLOv2)

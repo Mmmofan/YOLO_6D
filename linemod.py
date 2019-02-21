@@ -88,7 +88,7 @@ class Linemod(object):
             # images[idx] = self.image_read(self.imgname[idx + self.batch * self.batch_size], self.flipped)
             # labels[idx] = self.label_read(self.gt_labels[idx + self.batch * self.batch_size], self.flipped)
         for idx in range(self.batch_size):
-            images[idx] = self.image_bg_replace(self.imgname[idx+self.batch*self.batch_size][-8:-3], self.flipped)
+            images[idx] = self.image_bg_replace(self.imgname[idx + self.batch * self.batch_size][-8:-3], self.flipped)
             labels[idx] = self.label_read(self.gt_labels[idx + self.batch * self.batch_size], self.flipped)
 
         self.batch += 1
@@ -124,7 +124,6 @@ class Linemod(object):
                 labels = f.readline().split()
             for j in range(len(labels)):
                 labels[j] = float(labels[j])
-            labels[0] = int(labels[0]) * 1.0
             gt_labels.append(labels)
         return gt_labels
 
@@ -175,42 +174,45 @@ class Linemod(object):
         Return:
             A 3-D tensor with shape [13, 13, 19 + num_classes]
         """
-        labels = np.zeros((13, 13, 1+9*2 + self.num_classes), np.float32)
+        classes = np.zeros((13, 13, self.num_classes), np.float32)
 
         gt_label = gt_labels[0]
-        gt_xc = gt_labels[1]  * 13.0
-        gt_yc = gt_labels[2]  * 13.0
-        gt_x0 = gt_labels[3]  * 13.0
-        gt_y0 = gt_labels[4]  * 13.0
-        gt_x1 = gt_labels[5]  * 13.0
-        gt_y1 = gt_labels[6]  * 13.0
-        gt_x2 = gt_labels[7]  * 13.0
-        gt_y2 = gt_labels[8]  * 13.0
-        gt_x3 = gt_labels[9]  * 13.0
-        gt_y3 = gt_labels[10] * 13.0
-        gt_x4 = gt_labels[11] * 13.0
-        gt_y4 = gt_labels[12] * 13.0
-        gt_x5 = gt_labels[13] * 13.0
-        gt_y5 = gt_labels[14] * 13.0
-        gt_x6 = gt_labels[15] * 13.0
-        gt_y6 = gt_labels[16] * 13.0
-        gt_x7 = gt_labels[17] * 13.0
-        gt_y7 = gt_labels[18] * 13.0
+        gt_xc    = gt_labels[1]  * 13.0
+        gt_yc    = gt_labels[2]  * 13.0
+        gt_x0    = gt_labels[3]  * 13.0
+        gt_y0    = gt_labels[4]  * 13.0
+        gt_x1    = gt_labels[5]  * 13.0
+        gt_y1    = gt_labels[6]  * 13.0
+        gt_x2    = gt_labels[7]  * 13.0
+        gt_y2    = gt_labels[8]  * 13.0
+        gt_x3    = gt_labels[9]  * 13.0
+        gt_y3    = gt_labels[10] * 13.0
+        gt_x4    = gt_labels[11] * 13.0
+        gt_y4    = gt_labels[12] * 13.0
+        gt_x5    = gt_labels[13] * 13.0
+        gt_y5    = gt_labels[14] * 13.0
+        gt_x6    = gt_labels[15] * 13.0
+        gt_y6    = gt_labels[16] * 13.0
+        gt_x7    = gt_labels[17] * 13.0
+        gt_y7    = gt_labels[18] * 13.0
 
         if not flipped:
-            coords = [1.0, gt_xc, gt_yc, gt_x0, gt_y0, gt_x1, gt_y1, gt_x2, gt_y2, gt_x3, gt_y3,
-                           gt_x4, gt_y4, gt_x5, gt_y5, gt_x6, gt_y6, gt_x7, gt_y7]
+            coords = [0.0, gt_xc, gt_yc, gt_x0, gt_y0, gt_x1, gt_y1, gt_x2, gt_y2, gt_x3, gt_y3,
+                      gt_x4, gt_y4, gt_x5, gt_y5, gt_x6, gt_y6, gt_x7, gt_y7]
         else:
-            coords = [1.0, gt_xc, 13-gt_yc, gt_x7, 13-gt_y7, gt_x6, 13-gt_y6, gt_x5, 13-gt_y5, gt_x4, 13-gt_y4,
-                           gt_x3, 13-gt_y3, gt_x2, 13-gt_y2, gt_x1, 13-gt_y1, gt_x0, 13-gt_y0]
+            coords = [0.0, gt_xc, 13-gt_yc, gt_x7, 13-gt_y7, gt_x6, 13-gt_y6, gt_x5, 13-gt_y5, gt_x4, 13-gt_y4,
+                      gt_x3, 13-gt_y3, gt_x2, 13-gt_y2, gt_x1, 13-gt_y1, gt_x0, 13-gt_y0]
 
         response_x = int(gt_xc)
         response_y = int(gt_yc)
 
-        labels[response_x, response_y, :19] = coords
+        coords = np.array(coords).reshape(1, 1, -1)
+        coords = np.tile(coords, (13, 13, 1))  # [13, 13, 19]
+        
+        # labels[response_x, response_y, :19] = coords
 
         # set response value to 1
-        # labels[response_x, response_y, 0] = 1.0
+        coords[response_x, response_y, 0] = 1.0
 
         # set coodinates value
         # for i in range(1, 19, 1):
@@ -220,7 +222,9 @@ class Linemod(object):
         #         labels[response_x, response_y, i] = coords[i - 1]
 
         # set label
-        labels[response_x, response_y, 19 + int(gt_label)] = 1
+        classes[response_x, response_y, int(gt_label)] = 1  # [13, 13, classes]
+
+        labels = np.concatenate([coords, classes], 2)
 
         return labels
 

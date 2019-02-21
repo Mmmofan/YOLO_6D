@@ -64,11 +64,11 @@ class Detector(object):
             self.post_process(output, image_path, i)
         return
 
-    def post_process(self, input, image_path, number):
-        coords = input[:, :, :, :18]
-        class_prob = input[:, :, :, 18:-1]
-        confidence = input[:, :, :, -1]
-        # coords = np.concatenate([sigmoid_func(coords[:,:,:,:2]), coords[:,:,:,2:]], axis=3)
+    def post_process(self, output, image_path, number):
+        coords = output[:, :, :, :18] # [batch, 13, 13, 18]
+        class_prob = output[:, :, :, 18:-1]  # [batch, 13, 13, 13]
+        confidence = output[:, :, :, -1]  # [batch, 13, 13]
+        coords = np.concatenate([sigmoid_func(coords[:,:,:,:2]), coords[:,:,:,2:]], axis=3)
         # class_prob = softmax(class_prob)
 
         boxes = []
@@ -77,11 +77,10 @@ class Detector(object):
             max_conf = np.max(conf)
             idxi, idxj = np.where(conf == max_conf)
             idxi, idxj = idxi[0], idxj[0]
-            #idxi, idxj = 5, 4
             classes = class_prob[i, idxi, idxj, :]
-            classes = softmax(classes)
-            max_id =np.max(classes)
-            class_id = np.where(classes==max_id)
+            #classes = softmax(classes)
+            max_class_val= np.max(classes)
+            class_id = np.where(classes==max_class_val)
             coord = coords[i, idxi, idxj, :]
             xc = coord[0]  + idxi
             yc = coord[1]  + idxj
@@ -121,15 +120,24 @@ class Detector(object):
         name = 'draw_' + str(number) + self.categories[class_id] + '.jpg'
 
         cv2.circle(image, (xc, yc), 2, (255, 0, 0), 1)
-        cv2.line(image, (x1, y1), (x3, y3), (255,0,0), 2)
-        cv2.line(image, (x1, y1), (x5, y5), (255,0,0), 2)
-        cv2.line(image, (x3, y3), (x7, y7), (255,0,0), 2)
-        cv2.line(image, (x5, y5), (x7, y7), (255,0,0), 2)
+        cv2.line(image, (x1, y1), (x3, y3), (0,0,255), 2)
+        cv2.line(image, (x1, y1), (x5, y5), (0,0,255), 2)
+        cv2.line(image, (x3, y3), (x7, y7), (0,0,255), 2)
+        cv2.line(image, (x5, y5), (x7, y7), (0,0,255), 2)
 
-        cv2.line(image, (x2, y2), (x4, y4), (0,255,0), 2)
-        cv2.line(image, (x2, y2), (x6, y6), (0,255,0), 2)
-        cv2.line(image, (x8, y8), (x4, y4), (0,255,0), 2)
-        cv2.line(image, (x8, y8), (x6, y6), (0,255,0), 2)
+        cv2.line(image, (x2, y2), (x4, y4), (0,0,255), 2)
+        cv2.line(image, (x2, y2), (x6, y6), (0,0,255), 2)
+        cv2.line(image, (x8, y8), (x4, y4), (0,0,255), 2)
+        cv2.line(image, (x8, y8), (x6, y6), (0,0,255), 2)
+
+        cv2.line(image, (x1, y1), (x2, y2), (0,0,255), 2)
+        cv2.line(image, (x3, y3), (x4, y4), (0,0,255), 2)
+        cv2.line(image, (x5, y5), (x6, y6), (0,0,255), 2)
+        cv2.line(image, (x7, y7), (x8, y8), (0,0,255), 2)
+
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        text = 'center: (' + str(xc) + ',' + str(yc) + ')'
+        image = cv2.putText(image, text, (20, 20), font, 0.6, (0,0,255), 1)
         cv2.imwrite(name, image)
 
     def data_read(self, img, lbl):
@@ -137,54 +145,59 @@ class Detector(object):
         image = cv2.resize(image, (self.image_size, self.image_size))
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
         image = (image / 255.0) * 2.0 - 1.0
-        
+
         label = self.label_read(lbl)
 
         return image, label
 
     def label_read(self, gt_labels):
+        """
+        Args:
+            gt_labels: a ground true label contain coordinates and class
+            flipped: Whether the images are flipped
+        Return:
+            A 3-D tensor with shape [13, 13, 19 + num_classes]
+        """
+        classes = np.zeros((13, 13, self.num_classes), np.float32)
 
-        labels = np.zeros((13, 13, 1+self.boxes_per_cell*9*2 + self.num_classes), np.float32)
+        gt_label = gt_labels[0]
+        gt_xc    = gt_labels[1]  * 13.0
+        gt_yc    = gt_labels[2]  * 13.0
+        gt_x0    = gt_labels[3]  * 13.0
+        gt_y0    = gt_labels[4]  * 13.0
+        gt_x1    = gt_labels[5]  * 13.0
+        gt_y1    = gt_labels[6]  * 13.0
+        gt_x2    = gt_labels[7]  * 13.0
+        gt_y2    = gt_labels[8]  * 13.0
+        gt_x3    = gt_labels[9]  * 13.0
+        gt_y3    = gt_labels[10] * 13.0
+        gt_x4    = gt_labels[11] * 13.0
+        gt_y4    = gt_labels[12] * 13.0
+        gt_x5    = gt_labels[13] * 13.0
+        gt_y5    = gt_labels[14] * 13.0
+        gt_x6    = gt_labels[15] * 13.0
+        gt_y6    = gt_labels[16] * 13.0
+        gt_x7    = gt_labels[17] * 13.0
+        gt_y7    = gt_labels[18] * 13.0
 
-        gt_label = int(gt_labels[0])
-        gt_xc = gt_labels[1]  * 13
-        gt_yc = gt_labels[2]  * 13
-        gt_x0 = gt_labels[3]  * 13
-        gt_y0 = gt_labels[4]  * 13
-        gt_x1 = gt_labels[5]  * 13
-        gt_y1 = gt_labels[6]  * 13
-        gt_x2 = gt_labels[7]  * 13
-        gt_y2 = gt_labels[8]  * 13
-        gt_x3 = gt_labels[9]  * 13
-        gt_y3 = gt_labels[10] * 13
-        gt_x4 = gt_labels[11] * 13
-        gt_y4 = gt_labels[12] * 13
-        gt_x5 = gt_labels[13] * 13
-        gt_y5 = gt_labels[14] * 13
-        gt_x6 = gt_labels[15] * 13
-        gt_y6 = gt_labels[16] * 13
-        gt_x7 = gt_labels[17] * 13
-        gt_y7 = gt_labels[18] * 13
-
-        coords = [gt_xc, gt_yc, gt_x0, gt_y0, gt_x1, gt_y1, gt_x2, gt_y2, gt_x3, gt_y3,
-                    gt_x4, gt_y4, gt_x5, gt_y5, gt_x6, gt_y6, gt_x7, gt_y7]
+        
+        coords = [0.0, gt_xc, gt_yc, gt_x0, gt_y0, gt_x1, gt_y1, gt_x2, gt_y2, gt_x3, gt_y3,
+                  gt_x4, gt_y4, gt_x5, gt_y5, gt_x6, gt_y6, gt_x7, gt_y7]
 
         response_x = int(gt_xc)
         response_y = int(gt_yc)
 
+        coords = np.array(coords).reshape(1, 1, -1)
+        coords = np.tile(coords, (13, 13, 1))  # [13, 13, 19]
+        
+
         # set response value to 1
-        labels[response_x, response_y, 0] = 1
+        coords[response_x, response_y, 0] = 1.0
+
         # set label
-        label_num = 19 + gt_label
-        labels[response_x, response_y, label_num] = 1
+        classes[response_x, response_y, int(gt_label)] = 1  # [13, 13, classes]
 
-        # set coodinates value
-        for i in range(1, 19, 1):
-            if i % 2 != 0: # x
-                labels[response_x, response_y, i] = coords[i - 1] - response_x
-            else: # y
-                labels[response_x, response_y, i] = coords[i - 1] - response_y
-
+        labels = np.concatenate([coords, classes], 2)
 
         return labels
 
