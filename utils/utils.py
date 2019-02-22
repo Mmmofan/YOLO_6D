@@ -15,46 +15,6 @@ import tensorflow as tf
 import yolo.config as cfg
 
 
-def sigmoid_func(x, derivative=False):
-    """
-    Compute sigmoid of x element-wise
-    """
-    return x*(1-x) if derivative else 1/(1+np.exp(-x))
-
-def softmax(X, theta = 1.0, axis = None):
-    """
-    Compute the softmax of each element along an axis of X.
-
-    Parameters
-    ----------
-    X: ND-Array. Probably should be floats.
-    theta (optional): float parameter, used as a multiplier
-        prior to exponentiation. Default = 1.0
-    axis (optional): axis to compute values along. Default is the
-        first non-singleton axis.
-
-    Returns an array the same size as X. The result will sum to 1
-    along the specified axis.
-    """
-    # make X at least 2d
-    y = np.atleast_2d(X)
-    # find axis
-    if axis is None:
-        axis = next(j[0] for j in enumerate(y.shape) if j[1] > 1)
-    # multiply y against the theta parameter,
-    y = y * float(theta)
-    # subtract the max for numerical stability
-    y = y - np.expand_dims(np.max(y, axis = axis), axis)
-    # exponentiate y
-    y = np.exp(y)
-    # take the sum along the specified axis
-    ax_sum = np.expand_dims(np.sum(y, axis = axis), axis)
-    # finally: divide elementwise
-    p = y / ax_sum
-    # flatten if X was 1D
-    if len(X.shape) == 1: p = p.flatten()
-    return p
-
 def softmax_cross_entropy(label, logit, weights):
     """
     logit: output [B, classes]
@@ -66,13 +26,13 @@ def softmax_cross_entropy(label, logit, weights):
     assert(logit_shape == label_shape)
     epsilon = tf.constant(cfg.EPSILON, dtype=tf.float32)
 
-    logit = tf.exp(logit)
+    logit     = tf.exp(logit)
     logit_sum = tf.reduce_sum(logit, 1, keep_dims=True)
-    logit_sum = tf.tile(logit_sum, (1, logit_shape[1])) + epsilon
-    softmax = tf.divide(logit, logit_sum)
-    weights = tf.tile(weights, (1, label_shape[1]))
+    logit_sum = tf.tile(logit_sum, (1, logit_shape[1]))
+    softmax_t = logit / (logit_sum + epsilon)
+    weights   = tf.tile(weights, (1, label_shape[1]))
 
-    cross_entropy_loss = tf.multiply(tf.reduce_sum(-1.0 * label * tf.log(softmax), 1, keep_dims=True), weights)
+    cross_entropy_loss = tf.reduce_sum(-1.0 * label * tf.log(softmax_t), 1, keep_dims=True) * weights
     cross_entropy_loss = tf.reduce_sum(cross_entropy_loss)
 
     return cross_entropy_loss
@@ -86,6 +46,7 @@ def conf_mean_squared_error(logit, label, weights):
     logit_shape = logit.get_shape()
     label_shape = label.get_shape()
     assert(logit_shape == label_shape)
+
     diff = tf.squared_difference(logit, label)
     diff_mean = tf.reduce_mean(diff, len(logit_shape)-1, keep_dims=True)
     error = tf.multiply(diff_mean, weights)
@@ -101,6 +62,7 @@ def coord_mean_squared_error(logit, label, weights):
     logit_shape = logit.get_shape()
     label_shape = label.get_shape()
     assert(logit_shape == label_shape)
+
     diff = tf.squared_difference(logit, label)
     diff_mean = tf.reduce_mean(diff, len(logit_shape)-1, keep_dims=True)
     error = tf.multiply(diff_mean, weights)
@@ -118,7 +80,7 @@ def confidence9(pred_x, pred_y, gt_x, gt_y):
         confidence: [batch, cell_size, cell_size, 1]
     """
     alpha = tf.constant(cfg.ALPHA, dtype=tf.float32)
-    dth_in_cell_size = tf.constant(cfg.Dth, dtype=tf.float32)
+    dth = tf.constant(cfg.Dth, dtype=tf.float32)
     one = tf.constant(1.0, dtype=tf.float32)
     epsilon = tf.constant(cfg.EPSILON, dtype=tf.float32)
 
@@ -132,9 +94,9 @@ def confidence9(pred_x, pred_y, gt_x, gt_y):
 
     # if number in x <= dth_in_cell_size, the position in temp would be 1.0,
     # otherwise(x > dth_int_cell_size) would be 0
-    temp = tf.cast(dist <= dth_in_cell_size, tf.float32)
+    temp = tf.cast(dist < dth, tf.float32)
 
-    confidence = (tf.exp(alpha * (one - dist / dth_in_cell_size)) - one) / (tf.exp(alpha) - one + epsilon)
+    confidence = (tf.exp(alpha * (one - dist / dth)) - one) / (tf.exp(alpha) - one + epsilon)
 
     # if distance in x bigger than threshold, value calculated will be negtive,
     # use below to make the negtive to 0
