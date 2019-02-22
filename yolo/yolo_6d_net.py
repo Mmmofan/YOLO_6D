@@ -34,22 +34,16 @@ class YOLO6D_net:
         """
         self.is_training = is_training
         self.Batch_Size = cfg.BATCH_SIZE
-        self.WEIGHT_DECAY = cfg.WEIGHT_DECAY
-        self.MAX_PADDING = cfg.MAX_PAD
         self.EPSILON = cfg.EPSILON
         self.learning_rate = cfg.LEARNING_RATE
-        self.optimizer = None
         self.total_loss = None
         self.disp = cfg.DISP
-        self.param_num = 0
         self.boxes_per_cell = cfg.BOXES_PER_CELL
         self.image_size = cfg.IMAGE_SIZE
 
         self.num_class = cfg.NUM_CLASSES
         self.Batch_Norm = cfg.BATCH_NORM
-        self.ALPHA = cfg.ALPHA
         self.cell_size = cfg.CELL_SIZE
-        self.num_coord = cfg.NUM_COORD  ## 18: 9 points, 8 corners + 1 centroid
 
         self.obj_scale = cfg.CONF_OBJ_SCALE
         self.noobj_scale = cfg.CONF_NOOBJ_SCALE
@@ -58,12 +52,6 @@ class YOLO6D_net:
 
         self.boundry_1 = 9 * 2   ## Seperate coordinates
         self.boundry_2 = self.num_class
-
-        #off_set:  [self.cell_size, self.cell_size, 18]
-        self.off_set = np.transpose(np.reshape(np.array(
-                                    [np.arange(self.cell_size)] * self.cell_size * 18 * self.boxes_per_cell),
-                                    (18, self.cell_size, self.cell_size)),
-                                    (1, 2, 0))
 
         self.input_images = tf.placeholder(tf.float32, [None, self.image_size, self.image_size, 3], name='Input')
 
@@ -265,8 +253,8 @@ class YOLO6D_net:
 
             coord_loss = coord_mean_squared_error(predict_coord_tr, labels_coord, weights=coord_coef)
 
-            # class_loss = softmax_cross_entropy(labels_classes, predict_classes, weights=class_coef)
-            class_loss = tf.losses.softmax_cross_entropy(labels_classes, predict_classes)
+            class_loss = softmax_cross_entropy(labels_classes, predict_classes, weights=class_coef)
+            # class_loss = tf.losses.softmax_cross_entropy(labels_classes, predict_classes)
 
             loss = conf_loss + coord_loss + class_loss
 

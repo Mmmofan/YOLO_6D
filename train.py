@@ -43,10 +43,12 @@ class Solver(object):
         self.testing_errors_pixel = []
         self.testing_accuracies = []
 
-        self.saveconfig = False
         self.net = net
         self.data = data
-        self.batch_size = cfg.BATCH_SIZE
+        if arg.batch == 0:
+            self.batch_size = cfg.BATCH_SIZE
+        else:
+            self.batch_size = arg.batch
         self.epoch = cfg.EPOCH
         self.weight_file = os.path.join(cfg.WEIGHTS_DIR, arg.weights)
         self.cache_file  = cfg.CACHE_FILE
@@ -58,8 +60,6 @@ class Solver(object):
         self.summary_iter = cfg.SUMMARY_ITER
         self.save_iter = cfg.SAVE_ITER
         self.output_dir = cfg.OUTPUT_DIR
-        if self.saveconfig:
-            self.save_config()
 
         if arg.pre == True:
             self.variable_to_restore = tf.global_variables()[:-2]
@@ -101,7 +101,7 @@ class Solver(object):
         self.sess.run(tf.global_variables_initializer())
 
         if self.weight_file is not None:
-            print('\n----------Restoring weights from: {}------------'.format(self.weight_file))
+            print('\n----------Restoring weights from: {}------batch: {}--'.format(self.weight_file, self.batch_size))
             self.restorer.restore(self.sess, self.weight_file)
 
         self.writer.add_graph(self.sess.graph)
@@ -237,24 +237,6 @@ class Solver(object):
             # compute weighted average of 3x3 neighborhood
             #logit = compute_average(predicts[batch_idx], conf_sco, logit_nms)
 
-            """
-            # get all the boxes coordinates
-            all_boxes = get_region_boxes(logit, cfg.NUM_CLASSES)
-            #for k in range(num_gts):
-            box_gt = [truth[1], truth[2], truth[3], truth[4], truth[5],
-                        truth[6], truth[7], truth[8], truth[9], truth[10],
-                        truth[11], truth[12], truth[13], truth[14], truth[15],
-                        truth[16], truth[17], truth[18], 1.0, 1.0, truth[0]]
-            best_conf_est = -1
-
-            #If the prediction has the highest confidence, choose it as prediction
-            for j in range(len(all_boxes)):
-                if all_boxes[j][18] > best_conf_est:
-                    best_conf_est = all_boxes[j][18]
-                    box_pr = all_boxes[j]
-                    #match = corner_confidence9(box_gt[:18], all_boxes[j][:18])
-            """
-
             # get all the boxes coordinates
             # 1st: ground true boxes
             box_gt = [truth[1], truth[2], truth[3], truth[4], truth[5],
@@ -321,8 +303,6 @@ class Solver(object):
         acc = len(np.where(np.array(errs_2d) <= px_threshold)[0]) * 100. / (len(errs_2d)+eps)
         acc3d = len(np.where(np.array(errs_3d) <= self.vx_threshold)[0]) * 100. / (len(errs_3d)+eps)
         acc5cm5deg = len(np.where((np.array(errs_trans) <= 0.05) & (np.array(errs_angle) <= 5))[0]) * 100. / (len(errs_trans)+eps)
-        # corner_acc = len(np.where(np.array(errs_corner2D) <= px_threshold)[0]) * 100. / (len(errs_corner2D)+eps)
-        # mean_err_2d = np.mean(errs_2d)
         mean_corner_err_2d = np.mean(errs_corner2D)
         nts = float(testing_samples)
         # Print test statistics
@@ -340,34 +320,26 @@ class Solver(object):
         test_timer.average_time
         load_timer.average_time
 
-    def save_config(self):
-        with open(os.path.join(self.output_dir, 'config.txt'), 'w') as f:
-            cfg_dict = cfg.__dict__
-            for key in sorted(cfg_dict.keys()):
-                if key[0].isupper():
-                    cfg_str = '{}: {}\n'.format(key, cfg_dict[key])
-                    f.write(cfg_str)
-
     def __del__(self):
         self.sess.close()
 
 
 def update_config_paths(data_dir, weights_file):
-    cfg.DATA_DIR = data_dir
-    cfg.DATASETS_DIR = os.path.join(data_dir, 'datasets')
-    cfg.CACHE_DIR = os.path.join(cfg.DATASETS_DIR, 'cache')
-    cfg.OUTPUT_DIR = os.path.join(cfg.DATASETS_DIR, 'output')
-    cfg.WEIGHTS_DIR = os.path.join(cfg.DATASETS_DIR, 'weights')
+    cfg.DATA_DIR     = data_dir
+    cfg.CACHE_DIR    = os.path.join(cfg.DATA_DIR, 'cache')
+    cfg.OUTPUT_DIR   = os.path.join(cfg.DATA_DIR, 'output')
+    cfg.WEIGHTS_DIR  = os.path.join(cfg.DATA_DIR, 'weights')
     cfg.WEIGHTS_FILE = os.path.join(cfg.WEIGHTS_DIR, weights_file)
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--datacfg', default='cfg/ape.data', type=str)
-    parser.add_argument('--weights', default="yolo_6d.ckpt", type=str)
     parser.add_argument('--pre', default=False, type=bool)
-    parser.add_argument('--data_dir', default="data", type=str)
     parser.add_argument('--gpu', default='2', type=str)
+    parser.add_argument('--data_dir', default="data", type=str)
+    parser.add_argument('--weights', default="yolo_6d.ckpt", type=str)
+    parser.add_argument('--batch', default=0, type=int)
     args = parser.parse_args()
 
     if len(args.datacfg) == 0:
