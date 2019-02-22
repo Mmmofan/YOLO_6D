@@ -149,7 +149,7 @@ class Solver(object):
                             print('best loss!')
                             self.cacher.save(self.sess, self.cache_file)
                             best_loss = loss[0]
-                        if loss[0] > 10000 or loss[0] < -10000 or loss[0] is None:
+                        if loss[0] is None:
                             break
 
                         # test
