@@ -335,7 +335,7 @@ def update_config_paths(data_dir, weights_file):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--datacfg', default='cfg/ape.data', type=str)
-    parser.add_argument('--pre', default=False, type=bool)
+    parser.add_argument('--pre', default=True, type=bool)
     parser.add_argument('--gpu', default='2', type=str)
     parser.add_argument('--data_dir', default="data", type=str)
     parser.add_argument('--weights', default="yolo_6d.ckpt", type=str)
