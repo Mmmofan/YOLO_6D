@@ -1,8 +1,6 @@
 # Yolo 6d (singleshotpose)
 Repoducibility of the following paper:
 
-mofan
-
 [Bugra Tekin, Sudipta N. Sinha and Pascal Fua, "Real-Time Seamless Single Shot 6D Object Pose Prediction", CVPR 2018.](https://arxiv.org/pdf/1711.08848.pdf)
 
 I'm still training it and didn't get the accuracy as the Pytoch version which provided by author. 
@@ -35,7 +33,7 @@ wget https://pjreddie.com/media/files/VOCtrainval_11-May-2012.tar
 tar xf LINEMOD.tar
 tar xf VOCtrainval_11-May-2012.tar
 ```
-Because of the PyTorch *.weights* files cannot be used in TensorFlow,  you can down load the COCO pre-trained ***.ckpt*** files [here](https://drive.google.com/drive/folders/17yD4zWQCi3-D24CuxjzO6BGS6HZzKPHx). 
+Because of the PyTorch *.weights* files cannot be used in TensorFlow,  you can down load the COCO pre-trained ***.ckpt*** files [here]() (For the IP issues i can't share the checkpoint files now, you can go to any tensorflow yolov2 repo and download the ckpt files, in general you just need to remove last layer and ckpt files can be used). 
 
 ---
 
@@ -69,9 +67,9 @@ to see the result and accuracy.
 ---
 
 ### Problems and prograss
-I finish the pre-train step (it gets good accuracy on classification), but in training, I didn't get good result, the **coordinates loss** is hard to optimize and I have no answer for it.
-I think maybe the loss function are blamed on the inaccuray, if you find any incorrect of code, please send me an email [cokespace2@gmail.com](cokespace2@gmail.com), I will be appreciate that.
-The *valid.py* file is not finished yet, it now just to check whether one picture is predicted correctly.
+I finish the pre-train step (it gets good accuracy on classification), but in training, I didn't get good result, the **coordinates loss** has been down to 0.0x level, but predict coordinates are even can't match the ground truth, I think loss function may be on blame, I suggest any one who is interest iin this repo can check the loss function in [yolo/yolo_6d_net.py](https://github.com/Mmmofan/YOLO_6D/blob/master/yolo/yolo_6d_net.py)
+If you find any incorrect of code, please send me an email [cokespace2@gmail.com](cokespace2@gmail.com), I will be very appreciate that.
+The *valid.py* file is not finished yet, it now just to check whether pictures is predicted correctly.
 Also, I just test the model using single object, the occlusion part will be later uploaded to this repo
 
 Thanks for reading

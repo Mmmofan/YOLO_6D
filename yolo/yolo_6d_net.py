@@ -13,24 +13,14 @@ import tensorflow as tf
 import yolo.config as cfg
 from utils.utils import *
 
-
-"""
-5BTM 51C9 3791 5TKL
-This is the script to try to reproduce YOLO-6D
-input: a mini-batch of images
-train:
-
-"""
-
 class YOLO6D_net:
 
 
     def __init__(self, is_training=True):
         """
-        Input images: [416 * 416 * 3]
-        output tensor: [13 * 13 * (18 + 1 + num_classes)]
-            self.input_images ==> self.logit
-        Input labels: [batch * 13 * 13 * 20 + num_classes]
+        Input images: [batch, 416 * 416 * 3]
+        Input labels: [batch * 13 * 13 * (19 + num_classes)]
+        output tensor: [batch, 13 * 13 * (19 + num_classes)]
         """
         self.is_training = is_training
         self.Batch_Size = cfg.BATCH_SIZE
@@ -53,13 +43,13 @@ class YOLO6D_net:
         self.boundry_1 = 9 * 2   ## Seperate coordinates
         self.boundry_2 = self.num_class
 
-        self.input_images = tf.placeholder(tf.float32, [None, self.image_size, self.image_size, 3], name='Input')
+        self.input_images = tf.placeholder(tf.float32, [None, self.image_size, self.image_size, 3], name='images')
 
         self.logit = self.build_networks(self.input_images)
 
         if self.is_training:
             self.gt_conf = None
-            self.labels = tf.placeholder(tf.float32, [None, self.cell_size, self.cell_size, 19 + self.num_class], name='Labels')
+            self.labels = tf.placeholder(tf.float32, [None, self.cell_size, self.cell_size, 19 + self.num_class], name='labels')
             self.total_loss = self.loss_layer(self.logit, self.labels)
             # self.loss_layer(self.logit, self.labels)
             # self.total_loss = tf.losses.get_total_loss()
@@ -71,34 +61,33 @@ class YOLO6D_net:
         if self.disp:
             print("\n--------------Building network---------------")
         net = self.conv_layer(inputs, [3, 3, 3, 32], name = '0_conv')
+
         net = self.pooling_layer(net, name = '1_pool')
-
         net = self.conv_layer(net, [3, 3, 32, 64], name = '2_conv')
-        net = self.pooling_layer(net, name = '3_pool')
 
+        net = self.pooling_layer(net, name = '3_pool')
         net = self.conv_layer(net, [3, 3, 64, 128], name = '4_conv')
         net = self.conv_layer(net, [1, 1, 128, 64], name = '5_conv')
         net = self.conv_layer(net, [3, 3, 64, 128], name = '6_conv')
-        net = self.pooling_layer(net, name = '7_pool')
 
+        net = self.pooling_layer(net, name = '7_pool')
         net = self.conv_layer(net, [3, 3, 128, 256], name = '8_conv')
         net = self.conv_layer(net, [1, 1, 256, 128], name = '9_conv')
         net = self.conv_layer(net, [3, 3, 128, 256], name = '10_conv')
-        net = self.pooling_layer(net, name = '11_pool')
 
+        net = self.pooling_layer(net, name = '11_pool')
         net = self.conv_layer(net, [3, 3, 256, 512], name = '12_conv')
         net = self.conv_layer(net, [1, 1, 512, 256], name = '13_conv')
         net = self.conv_layer(net, [3, 3, 256, 512], name = '14_conv')
         net = self.conv_layer(net, [1, 1, 512, 256], name = '15_conv')
         net16 = self.conv_layer(net, [3, 3, 256, 512], name = '16_conv')
-        net = self.pooling_layer(net16, name = '17_pool')
 
+        net = self.pooling_layer(net16, name = '17_pool')
         net = self.conv_layer(net, [3, 3, 512, 1024], name = '18_conv')
         net = self.conv_layer(net, [1, 1, 1024, 512], name = '19_conv')
         net = self.conv_layer(net, [3, 3, 512, 1024], name = '20_conv')
         net = self.conv_layer(net, [1, 1, 1024, 512], name = '21_conv')
         net = self.conv_layer(net, [3, 3, 512, 1024], name = '22_conv')
-
         net = self.conv_layer(net, [3, 3, 1024, 1024], name = '23_conv')
         net24 = self.conv_layer(net, [3, 3, 1024, 1024], name = '24_conv')
 
@@ -115,8 +104,10 @@ class YOLO6D_net:
         return net
 
     def conv_layer(self, inputs, shape, batch_norm = True, name = '0_conv', activation = 'leaky'):
-        weight = tf.Variable(tf.truncated_normal(shape, stddev=0.1), name='weight')
-        biases = tf.Variable(tf.constant(0.1, shape=[shape[3]]), name='biases')
+        initializer = tf.contrib.layers.xavier_initializer()
+        weight = tf.Variable(initializer(shape), name='weight')
+        # weight = tf.Variable(tf.truncated_normal(shape, stddev=0.1), name='weight')
+        biases = tf.Variable(tf.constant(1.0, shape=[shape[3]]), name='biases')
 
         conv = tf.nn.conv2d(inputs, weight, strides=[1, 1, 1, 1], padding='SAME', name=name)
 
@@ -172,13 +163,16 @@ class YOLO6D_net:
             response = tf.reshape(labels[:, :, :, 0], [self.Batch_Size, self.cell_size, self.cell_size, 1])
 
             gt_tensor = []
+            gt_idx = []
             # get the responsible tensor's index
             for i in range(self.Batch_Size):
                 gt_resp = tf.reshape(response[i], [self.cell_size, self.cell_size])
                 gt_i, gt_j = get_max_index(gt_resp)
                 temp_tensor = labels[i, gt_i, gt_j,:]  # shape: [32,]
                 gt_tensor.append(temp_tensor)
+                gt_idx.append([gt_i, gt_j])
             gt_tensor = tf.convert_to_tensor(gt_tensor)  # shape: [batch, 32], store object tensors
+            gt_idx    = tf.convert_to_tensor(gt_coords)  # shape: [batch, 2]
             #metric
             labels_coord   = gt_tensor[:, 1:self.boundry_1+1]  # for later coord loss
             labels_classes = gt_tensor[:, self.boundry_1+1: ]  # for later class loss
@@ -226,7 +220,12 @@ class YOLO6D_net:
             for i in range(self.Batch_Size):
                 pred_conf = predict_conf[i]
                 pred_conf = tf.reshape(pred_conf, [self.cell_size, self.cell_size])
-                pred_i, pred_j = get_max_index(pred_conf)
+                if self.obj_scale == 0.0:
+                    # means in pre train
+                    pred_i, pred_j = gt_idx[i, 0], gt_idx[i, 1]
+                else:
+                    # in training
+                    pred_i, pred_j = get_max_index(pred_conf)
                 temp_tensor = pred_boxes[i, pred_i, pred_j, :]
                 pred_tensor.append(temp_tensor)
             pred_tensor = tf.convert_to_tensor(pred_tensor)  # shape: [batch, 31], store tensors with max_confidence

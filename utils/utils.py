@@ -139,6 +139,7 @@ def get_max_index(confidence):
     max_val  = tf.reduce_max(confidence)
     bool_idx = tf.equal(confidence, max_val)
     int_idx  = tf.where(bool_idx)
+    assert(int_idx.get_shape()[0]==1)
     assert(int_idx.get_shape()[1]==2)
     maxi = int_idx[0, 0]
     maxj = int_idx[0, 1]
