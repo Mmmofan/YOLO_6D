@@ -1,11 +1,11 @@
-# Yolo 6d (singleshotpose)
+# Yolo 6d (singleshotposeestimate)
 Repoducibility of the following paper:
 
 [Bugra Tekin, Sudipta N. Sinha and Pascal Fua, "Real-Time Seamless Single Shot 6D Object Pose Prediction", CVPR 2018.](https://arxiv.org/pdf/1711.08848.pdf)
 
 I'm still training it and didn't get the accuracy as the Pytoch version which provided by author. 
 If you're also interested in this paper and want to implement it on TensorFlow, this repo could be a help.
-I will leave the **problems and newest prograss** in the **final part**. If anyone meet the same issues or can solve the problems please feel free to leave me a message or send me an email: [cokespace2@gmail.com](cokespace2@gmail.com), we can discuss a bit deeper.
+I will leave the **problems and newest prograss** in the **final part**. If anyone meet the same issues or have some suggestion please feel free to leave me a message or send me an email: [cokespace2@gmail.com](cokespace2@gmail.com), we can discuss a bit deeper.
 
 ---
 
@@ -20,7 +20,7 @@ As I understand, this code use YOLO_v2 architecture and add pose estimation to i
 ---
 
 ### Environment and dependencies
-This code is test on Linux (ubuntu 16.04) with CUDA 9.0 and cudNN v7. This implementation is write on TensorFlow 1.8.0 (former or later version can still run this) using Python 3.5.3. To run this you need to install following dependencies with PIP or CONDA: 
+This code is test on Linux (ubuntu 16.04) with CUDA 9.0 and cudNN v7. This implementation is write on TensorFlow 1.8.0 using Python 3.5.3. To run this you need to install following dependencies with PIP or CONDA: 
 Python 3.5.4, TensorFlow 1.8.0, Numpy 1.15.4, OpenCV 3.4.0.
 
 ---
@@ -50,7 +50,7 @@ the first argv *datacfg* represents the catogories of dataset, second argv *pre*
 ---
 
 ### Train the model
-When finish pre-train and set the right *.ckpt* files(make sure the name, path right), run this code to train the model
+When finish pre-train and set the right *.ckpt* files(make sure the name, path correct), run below to train the model
 ```
 python train.py --datacfg cfg/ape.data --gpu 2
 ```
@@ -67,7 +67,7 @@ to see the result and accuracy.
 ---
 
 ### Problems and prograss
-I finish the pre-train step (it gets good accuracy on classification), but in training, I didn't get good result, the **coordinates loss** has been down to 0.0x level, but predict coordinates are even can't match the ground truth, I think loss function may be on blame, I suggest any one who is interest iin this repo can check the loss function in [yolo/yolo_6d_net.py](https://github.com/Mmmofan/YOLO_6D/blob/master/yolo/yolo_6d_net.py)
+I finish the pre-train step (it gets good accuracy on classification), but in training, I didn't get such a good result, the **coordinates loss** has been down to 0.0x level, but predict coordinates are even can't perfectly match the ground truth, I think loss function may be on blame, I suggest any one who is interest iin this repo can check the loss function in [yolo/yolo_6d_net.py](https://github.com/Mmmofan/YOLO_6D/blob/master/yolo/yolo_6d_net.py)
 If you find any incorrect of code, please send me an email [cokespace2@gmail.com](cokespace2@gmail.com), I will be very appreciate that.
 The *valid.py* file is not finished yet, it now just to check whether pictures is predicted correctly.
 Also, I just test the model using single object, the occlusion part will be later uploaded to this repo
