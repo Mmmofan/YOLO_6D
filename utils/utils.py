@@ -38,7 +38,7 @@ def softmax(X, theta = 1.0, axis = None):
 
     return p
 
-def softmax_cross_entropy(label, logit, weights):
+def softmax_cross_entropy(logit, label, weights):
     """
     logit: output [B, classes]
     label: ground truth [B, classes]
@@ -71,7 +71,7 @@ def conf_mean_squared_error(logit, label, weights):
     assert(logit_shape == label_shape)
 
     diff = tf.squared_difference(logit, label)
-    diff_mean = tf.reduce_mean(diff, len(logit_shape)-1, keep_dims=True)
+    assert(diff.get_shape() == logit_shape)
     error = tf.multiply(diff_mean, weights)
     error = tf.reduce_sum(error)
     return error
@@ -87,7 +87,7 @@ def coord_mean_squared_error(logit, label, weights):
     assert(logit_shape == label_shape)
 
     diff = tf.squared_difference(logit, label)
-    diff_mean = tf.reduce_mean(diff, len(logit_shape)-1, keep_dims=True)
+    diff_mean = tf.reduce_mean(diff, 1, keep_dims=True)
     error = tf.multiply(diff_mean, weights)
     error = tf.reduce_sum(error)
     return error
@@ -102,6 +102,13 @@ def confidence9(pred_x, pred_y, gt_x, gt_y):
     Return:
         confidence: [batch, cell_size, cell_size, 1]
     """
+    pred_x_shape = pred_x.get_shape()
+    pred_y_shape = pred_y.get_shape()
+    gt_x_shape   = gt_x.get_shape()
+    gt_y_shape   = gt_y.get_shape()
+    assert(pred_x_shape == gt_x_shape)
+    assert(pred_y_shape == gt_y_shape)
+
     alpha = tf.constant(cfg.ALPHA, dtype=tf.float32)
     dth = tf.constant(cfg.Dth, dtype=tf.float32)
     one = tf.constant(1.0, dtype=tf.float32)
@@ -114,6 +121,7 @@ def confidence9(pred_x, pred_y, gt_x, gt_y):
     dist_x = tf.squared_difference(pred_x, gt_x)
     dist_y = tf.squared_difference(pred_y, gt_y)
     dist   = tf.sqrt(dist_x + dist_y)
+    assert(dist.get_shape() == gt_x_shape)
 
     # if number in x <= dth_in_cell_size, the position in temp would be 1.0,
     # otherwise(x > dth_int_cell_size) would be 0

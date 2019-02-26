@@ -252,7 +252,7 @@ class YOLO6D_net:
 
             coord_loss = coord_mean_squared_error(predict_coord_tr, labels_coord, weights=coord_coef)
 
-            class_loss = softmax_cross_entropy(labels_classes, predict_classes, weights=class_coef)
+            class_loss = softmax_cross_entropy(predict_classes, labels_classes, weights=class_coef)
             # class_loss = tf.losses.softmax_cross_entropy(labels_classes, predict_classes)
 
             loss = conf_loss + coord_loss + class_loss
