@@ -106,8 +106,8 @@ def confidence9(pred_x, pred_y, gt_x, gt_y):
     pred_y_shape = pred_y.get_shape()
     gt_x_shape   = gt_x.get_shape()
     gt_y_shape   = gt_y.get_shape()
-    assert(pred_x_shape == gt_x_shape)
-    assert(pred_y_shape == gt_y_shape)
+    assert(pred_x_shape[1:] == gt_x_shape[1:])
+    assert(pred_y_shape[1:] == gt_y_shape[1:])
 
     alpha = tf.constant(cfg.ALPHA, dtype=tf.float32)
     dth = tf.constant(cfg.Dth, dtype=tf.float32)
@@ -121,7 +121,6 @@ def confidence9(pred_x, pred_y, gt_x, gt_y):
     dist_x = tf.squared_difference(pred_x, gt_x)
     dist_y = tf.squared_difference(pred_y, gt_y)
     dist   = tf.sqrt(dist_x + dist_y)
-    assert(dist.get_shape() == gt_x_shape)
 
     # if number in x <= dth_in_cell_size, the position in temp would be 1.0,
     # otherwise(x > dth_int_cell_size) would be 0
