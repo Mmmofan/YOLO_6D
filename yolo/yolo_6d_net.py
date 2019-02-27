@@ -172,7 +172,7 @@ class YOLO6D_net:
                 gt_tensor.append(temp_tensor)
                 gt_idx.append([gt_i, gt_j])
             gt_tensor = tf.convert_to_tensor(gt_tensor)  # shape: [batch, 32], store object tensors
-            gt_idx    = tf.convert_to_tensor(gt_coords)  # shape: [batch, 2]
+            gt_idx    = tf.convert_to_tensor(gt_idx)  # shape: [batch, 2]
             #metric
             labels_coord   = gt_tensor[:, 1:self.boundry_1+1]  # for later coord loss
             labels_classes = gt_tensor[:, self.boundry_1+1: ]  # for later class loss
