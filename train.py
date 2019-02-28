@@ -53,7 +53,7 @@ class Solver(object):
         self.weight_file = os.path.join(cfg.WEIGHTS_DIR, arg.weights)
         self.cache_file  = cfg.CACHE_FILE
         self.max_iter = int(len(data.imgname) / self.batch_size)
-        self.inital_learning_rate = cfg.LEARNING_RATE  # 0.001
+        self.inital_learning_rate = cfg.LEARNING_RATE  # 0.0001
         self.decay_steps = cfg.DECAY_STEP
         self.decay_rate = cfg.DECAY_RATE
         self.staircase = cfg.STAIRCASE
@@ -61,49 +61,44 @@ class Solver(object):
         self.save_iter = cfg.SAVE_ITER
         self.output_dir = cfg.OUTPUT_DIR
 
-        if arg.pre == True:
+        if arg.pre:
             self.variable_to_restore = tf.global_variables()[:-2]
         else:
             self.variable_to_restore = tf.global_variables()
+
         self.variable_to_save = tf.global_variables()
         self.restorer = tf.train.Saver(self.variable_to_restore, max_to_keep=3)
         self.saver = tf.train.Saver(self.variable_to_save, max_to_keep=3)
         self.cacher = tf.train.Saver(self.variable_to_save, max_to_keep=3)
-
         self.ckpt_file = os.path.join(self.weight_file, arg.weights)
         self.summary_op = tf.summary.merge_all()
         self.writer = tf.summary.FileWriter(self.output_dir, flush_secs=60)
-
         self.global_step = tf.Variable(0, name='global_step', trainable=False)
-        # self.learning_rate = tf.train.exponential_decay(self.inital_learning_rate, self.global_step,
-                                                        # self.decay_steps, self.decay_rate, self.staircase, name='learning_rate')
+
         if arg.pre:
             boundaries = cfg.PRE_BOUNDARIES
-            learning_rate = cfg.LEARNING_RATE
         else:
             boundaries = cfg.BOUNDARIES
-            learning_rate = cfg.LEARNING_RATE
-
+        learning_rate = cfg.L_R_STAIR
         self.learning_rate = tf.train.piecewise_constant(self.global_step, boundaries, learning_rate, name='learning_rate')
         self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(
-           self.net.total_loss[0], global_step=self.global_step)
+            self.net.total_loss[0], global_step=self.global_step)
+        # self.learning_rate = tf.train.exponential_decay(self.inital_learning_rate, self.global_step, self.decay_steps,
+                                                        # self.decay_rate, self.staircase, name='learning_rate')
         # self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate).minimize(
             # self.net.total_loss[0], global_step=self.global_step)
+
         self.ema = tf.train.ExponentialMovingAverage(decay=0.999)
         self.averages_op = self.ema.apply(tf.trainable_variables())
         with tf.control_dependencies([self.optimizer]):
             self.train_op = tf.group(self.averages_op)
-
         gpu_options = tf.GPUOptions(allow_growth=True)
         config = tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True)
-
         self.sess = tf.Session(config=config)
         self.sess.run(tf.global_variables_initializer())
-
         if self.weight_file is not None:
             print('\n----------Restoring weights from: {}------batch: {}--'.format(self.weight_file, self.batch_size))
             self.restorer.restore(self.sess, self.weight_file)
-
         self.writer.add_graph(self.sess.graph)
 
 
@@ -132,7 +127,7 @@ class Solver(object):
                         train_timer.toc()
 
                         log_str = ('\n   {}, Epoch:{}, Step:{}, Learning rate:{},\n'
-                                   '   Loss: {:5.3f}, conf_loss: {:5.3f}, coord_loss: {:5.3f}, class_loss: {:5.3f},\n '
+                                   '   Loss: {:5.3f}, conf_loss: {:5.3f}, coord_loss: {:5.3f}, class_loss: {:5.3f},\n'
                                    '   Speed: {:.3f}s/iter, Load: {:.3f}s/iter, Remain: {}').format(
                             datetime.datetime.now().strftime('%m/%d %H:%M:%S'),
                             epoch,
@@ -335,7 +330,7 @@ def update_config_paths(data_dir, weights_file):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--datacfg', default='cfg/ape.data', type=str)
-    parser.add_argument('--pre', default=True, type=bool)
+    parser.add_argument('--pre', default=False, type=bool)
     parser.add_argument('--gpu', default='2', type=str)
     parser.add_argument('--data_dir', default="data", type=str)
     parser.add_argument('--weights', default="yolo_6d.ckpt", type=str)
@@ -344,6 +339,7 @@ def main():
 
     if len(args.datacfg) == 0:
         print('No datacfg file specified')
+        return
 
     if args.pre:
         print("Pre-training... ")

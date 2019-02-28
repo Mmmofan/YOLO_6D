@@ -104,9 +104,9 @@ class YOLO6D_net:
         return net
 
     def conv_layer(self, inputs, shape, batch_norm = True, name = '0_conv', activation = 'leaky'):
-        # initializer = tf.contrib.layers.xavier_initializer()
-        # weight = tf.Variable(initializer(shape), name='weight')
-        weight = tf.Variable(tf.truncated_normal(shape, stddev=0.1), name='weight')
+        initializer = tf.contrib.layers.xavier_initializer()
+        weight = tf.Variable(initializer(shape), name='weight')
+        # weight = tf.Variable(tf.truncated_normal(shape, stddev=0.1), name='weight')
         biases = tf.Variable(tf.constant(1.0, shape=[shape[3]]), name='biases')
 
         conv = tf.nn.conv2d(inputs, weight, strides=[1, 1, 1, 1], padding='SAME', name=name)
