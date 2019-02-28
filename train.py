@@ -64,7 +64,7 @@ class Solver(object):
         if arg.pre == True:
             self.variable_to_restore = tf.global_variables()[:-2]
         else:
-            self.variable_to_restore = tf.global_variables()[:-2]
+            self.variable_to_restore = tf.global_variables()
         self.variable_to_save = tf.global_variables()
         self.restorer = tf.train.Saver(self.variable_to_restore, max_to_keep=3)
         self.saver = tf.train.Saver(self.variable_to_save, max_to_keep=3)
@@ -172,7 +172,7 @@ class Solver(object):
 
                 else:
                     train_timer.tic()
-                    self.sess.run(self.train_op, feed_dict=feed_dict)
+                    output, loss,  _ = self.sess.run([self.net.logit, self.net.total_loss, self.train_op], feed_dict=feed_dict)
                     train_timer.toc()
 
                 if step % self.save_iter == 0:

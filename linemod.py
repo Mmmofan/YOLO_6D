@@ -138,7 +138,6 @@ class Linemod(object):
     def image_bg_replace(self, imgname, flip):
         imgname += 'png'
         mask_path = self.mask_path + imgname
-        mask = Image.open(mask_path)
         mask = cv2.imread(mask_path)
         mask = cv2.resize(mask, (self.image_size, self.image_size))
 
@@ -193,6 +192,9 @@ class Linemod(object):
         gt_x7    = gt_labels[17] * 13.0
         gt_y7    = gt_labels[18] * 13.0
 
+        response_x = int(gt_xc)
+        response_y = int(gt_yc)
+
         if not flip:
             coords = [0.0, gt_xc, gt_yc, gt_x0, gt_y0, gt_x1, gt_y1, gt_x2, gt_y2, gt_x3, gt_y3,
                       gt_x4, gt_y4, gt_x5, gt_y5, gt_x6, gt_y6, gt_x7, gt_y7]
@@ -200,12 +202,9 @@ class Linemod(object):
             coords = [0.0, gt_xc, 13-gt_yc, gt_x7, 13-gt_y7, gt_x6, 13-gt_y6, gt_x5, 13-gt_y5, gt_x4, 13-gt_y4,
                       gt_x3, 13-gt_y3, gt_x2, 13-gt_y2, gt_x1, 13-gt_y1, gt_x0, 13-gt_y0]
 
-        response_x = int(gt_xc)
-        response_y = int(gt_yc)
-
         coords = np.array(coords).reshape(1, 1, -1)
         coords = np.tile(coords, (13, 13, 1))  # [13, 13, 19]
-        
+
         # set response value to 1
         coords[response_x, response_y, 0] = 1.0
 

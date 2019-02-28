@@ -104,9 +104,9 @@ class YOLO6D_net:
         return net
 
     def conv_layer(self, inputs, shape, batch_norm = True, name = '0_conv', activation = 'leaky'):
-        initializer = tf.contrib.layers.xavier_initializer()
-        weight = tf.Variable(initializer(shape), name='weight')
-        # weight = tf.Variable(tf.truncated_normal(shape, stddev=0.1), name='weight')
+        # initializer = tf.contrib.layers.xavier_initializer()
+        # weight = tf.Variable(initializer(shape), name='weight')
+        weight = tf.Variable(tf.truncated_normal(shape, stddev=0.1), name='weight')
         biases = tf.Variable(tf.constant(1.0, shape=[shape[3]]), name='biases')
 
         conv = tf.nn.conv2d(inputs, weight, strides=[1, 1, 1, 1], padding='SAME', name=name)
@@ -119,7 +119,7 @@ class YOLO6D_net:
             variance = tf.Variable(tf.ones([depth, ], dtype='float32'), name='rolling_variance')
 
             conv = tf.nn.batch_normalization(conv, mean, variance, shift, scale, 1e-05)
-            # conv = tf.add(conv, biases)
+            conv = tf.add(conv, biases)
         else:
             conv = tf.add(conv, biases)
 
@@ -194,12 +194,12 @@ class YOLO6D_net:
             off_set_y  = np.transpose(off_set_x, (1, 0, 2))
             off_set_x  = np.tile(np.transpose(np.reshape(off_set_x, (13, 13, 9, 1)), (3, 0, 1, 2)), (self.Batch_Size, 1, 1, 1))  # [Batch, cell, cell, 9]
             off_set_y  = np.tile(np.transpose(np.reshape(off_set_y, (13, 13, 9, 1)), (3, 0, 1, 2)), (self.Batch_Size, 1, 1, 1))  # [Batch, cell, cell, 9]
-            predict__x = tf.transpose(tf.stack([predict_boxes_tr[:,:,:,0], predict_boxes_tr[:,:,:,2], predict_boxes_tr[:,:,:,4],
-                                                predict_boxes_tr[:,:,:,6], predict_boxes_tr[:,:,:,8], predict_boxes_tr[:,:,:,10],
+            predict__x = tf.transpose(tf.stack([predict_boxes_tr[:,:,:,0],  predict_boxes_tr[:,:,:,2],  predict_boxes_tr[:,:,:,4],
+                                                predict_boxes_tr[:,:,:,6],  predict_boxes_tr[:,:,:,8],  predict_boxes_tr[:,:,:,10],
                                                 predict_boxes_tr[:,:,:,12], predict_boxes_tr[:,:,:,14], predict_boxes_tr[:,:,:,16]]),
                                                 (1,2,3,0))  # [Batch, cell, cell, 9]
-            predict__y = tf.transpose(tf.stack([predict_boxes_tr[:,:,:,1], predict_boxes_tr[:,:,:,3], predict_boxes_tr[:,:,:,5],
-                                                predict_boxes_tr[:,:,:,7], predict_boxes_tr[:,:,:,9], predict_boxes_tr[:,:,:,11],
+            predict__y = tf.transpose(tf.stack([predict_boxes_tr[:,:,:,1],  predict_boxes_tr[:,:,:,3],  predict_boxes_tr[:,:,:,5],
+                                                predict_boxes_tr[:,:,:,7],  predict_boxes_tr[:,:,:,9],  predict_boxes_tr[:,:,:,11],
                                                 predict_boxes_tr[:,:,:,13], predict_boxes_tr[:,:,:,15], predict_boxes_tr[:,:,:,17]]),
                                                 (1,2,3,0))  # [Batch, cell, cell, 9]
             pred_box_x = predict__x + off_set_x  # predict boxes x coordinates with offset, for later conf calculate

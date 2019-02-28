@@ -72,7 +72,7 @@ def conf_mean_squared_error(logit, label, weights):
 
     diff = tf.squared_difference(logit, label)
     assert(diff.get_shape() == logit_shape)
-    error = tf.multiply(diff_mean, weights)
+    error = tf.multiply(diff, weights)
     error = tf.reduce_sum(error)
     return error
 
@@ -114,10 +114,10 @@ def confidence9(pred_x, pred_y, gt_x, gt_y):
     one = tf.constant(1.0, dtype=tf.float32)
     epsilon = tf.constant(cfg.EPSILON, dtype=tf.float32)
 
-    pred_x = pred_x * 32.0
-    pred_y = pred_y * 32.0
-    gt_x   = gt_x   * 32.0
-    gt_y   = gt_y   * 32.0
+    pred_x = pred_x / 13.0 * 640
+    pred_y = pred_y / 13.0 * 480
+    gt_x   = gt_x   / 13.0 * 640
+    gt_y   = gt_y   / 13.0 * 480
     dist_x = tf.squared_difference(pred_x, gt_x)
     dist_y = tf.squared_difference(pred_y, gt_y)
     dist   = tf.sqrt(dist_x + dist_y)
@@ -128,8 +128,6 @@ def confidence9(pred_x, pred_y, gt_x, gt_y):
 
     confidence = (tf.exp(alpha * (one - dist / dth)) - one) / (tf.exp(alpha) - one + epsilon)
 
-    # if distance in x bigger than threshold, value calculated will be negtive,
-    # use below to make the negtive to 0
     confidence = confidence * temp
 
     confidence = tf.reduce_mean(confidence, 3, keep_dims=True)
