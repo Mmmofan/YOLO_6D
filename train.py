@@ -64,7 +64,7 @@ class Solver(object):
         if arg.pre:
             self.variable_to_restore = tf.global_variables()[:-2]
         else:
-            self.variable_to_restore = tf.global_variables()
+            self.variable_to_restore = tf.global_variables()[:-2]
 
         self.variable_to_save = tf.global_variables()
         self.restorer = tf.train.Saver(self.variable_to_restore, max_to_keep=3)

@@ -54,6 +54,7 @@ L_R_STAIR      = [0.0001, 0.0001, 0.00001, 0.0001, 0.00001, 0.000001]
 DECAY_STEP     = 10000
 DECAY_RATE     = 0.1
 STAIRCASE      = True
+SHUFFLE        = True
 
 EPOCH = 200
 
