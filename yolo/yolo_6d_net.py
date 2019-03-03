@@ -255,6 +255,16 @@ class YOLO6D_net:
         return loss
 
     def build_targets(self, pred_corners, target, num_classes, nH, nW, noobject_scale, object_scale, sil_thresh):
+        """
+        pred_corners:   [(nB X 169), 18]
+        target:         [nB, 21]
+        num_classes:    1
+        nH:             13
+        nW:             13
+        noobject_scale: 0.1
+        object_scale:   5
+        sil_thresh:     0.6
+        """
         nB = self.Batch_Size
         nC = num_classes
         conf_mask  = tf.ones([nB, nH, nW]) * noobject_scale
@@ -285,15 +295,15 @@ class YOLO6D_net:
         nPixels  = nH*nW
         for b in range(nB):
             cur_pre_corners = tf.transpose(pred_corners[b*nAnchors:(b+1)*nAnchors], (1,0)) # 18 X 169
-            gx0 = target[b][1] * nW  # a value
-            gy0 = target[b][2] * nH
-            gx1 = target[b][3] * nW
-            gy1 = target[b][4] * nH
-            gx2 = target[b][5] * nW
-            gy2 = target[b][6] * nH
-            gx3 = target[b][7] * nW
-            gy3 = target[b][8] * nH
-            gx4 = target[b][9] * nW
+            gx0 = target[b][1]  * nW  # a value, in cell size
+            gy0 = target[b][2]  * nH
+            gx1 = target[b][3]  * nW
+            gy1 = target[b][4]  * nH
+            gx2 = target[b][5]  * nW
+            gy2 = target[b][6]  * nH
+            gx3 = target[b][7]  * nW
+            gy3 = target[b][8]  * nH
+            gx4 = target[b][9]  * nW
             gy4 = target[b][10] * nH
             gx5 = target[b][11] * nW
             gy5 = target[b][12] * nH
@@ -307,7 +317,7 @@ class YOLO6D_net:
                 gx5/nW,gy5/nH,gx6/nW,gy6/nH,gx7/nW,gy7/nH,gx8/nW,gy8/nH]])
             cur_gt_corners = tf.transpose(tf.tile(cur_gt_corners, (nAnchors, 1)), (1, 0))  # 18 X 169
             cur_confs = tf.nn.relu(corner_confidences9(cur_pre_corners, cur_gt_corners))
-            temp = tf.cast(cur_confs < sil_thresh, tf.float32)
+            temp = tf.reshape(tf.cast(cur_confs < sil_thresh, tf.float32), (nH, nW))
             conf_mask[b] = conf_mask[b] * temp
 
         nGT = 0
