@@ -3,7 +3,8 @@ Repoducibility of the following paper:
 
 [Bugra Tekin, Sudipta N. Sinha and Pascal Fua, "Real-Time Seamless Single Shot 6D Object Pose Prediction", CVPR 2018.](https://arxiv.org/pdf/1711.08848.pdf)
 
-I'm still training it and didn't get the accuracy as the Pytoch version which provided by author. 
+I'm rewriting it(basically loss function) but tensorflow has many restricts (like tensor can not be assigned and so on), so it might take days until you can download this code and run it. Previous code didn't get the accuracy as the PyTorch version that's why I decided to rewrite it :)
+
 If you're also interested in this paper and want to implement it on TensorFlow, this repo could be a help.
 I will leave the **problems and newest prograss** in the **final part**. If anyone meet the same issues or have some suggestion please feel free to leave me a message or send me an email: [cokespace2@gmail.com](cokespace2@gmail.com), we can discuss a bit deeper.
 
