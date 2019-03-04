@@ -267,29 +267,29 @@ class YOLO6D_net:
         """
         nB = self.Batch_Size
         nC = num_classes
-        conf_mask  = tf.ones([nB, nH, nW]) * noobject_scale
-        coord_mask = tf.zeros([nB, nH, nW])
-        cls_mask   = tf.zeros([nB, nH, nW])
-        tx0        = tf.zeros([nB, nH, nW])
-        ty0        = tf.zeros([nB, nH, nW])
-        tx1        = tf.zeros([nB, nH, nW])
-        ty1        = tf.zeros([nB, nH, nW])
-        tx2        = tf.zeros([nB, nH, nW])
-        ty2        = tf.zeros([nB, nH, nW])
-        tx3        = tf.zeros([nB, nH, nW])
-        ty3        = tf.zeros([nB, nH, nW])
-        tx4        = tf.zeros([nB, nH, nW])
-        ty4        = tf.zeros([nB, nH, nW])
-        tx5        = tf.zeros([nB, nH, nW])
-        ty5        = tf.zeros([nB, nH, nW])
-        tx6        = tf.zeros([nB, nH, nW])
-        ty6        = tf.zeros([nB, nH, nW])
-        tx7        = tf.zeros([nB, nH, nW])
-        ty7        = tf.zeros([nB, nH, nW])
-        tx8        = tf.zeros([nB, nH, nW])
-        ty8        = tf.zeros([nB, nH, nW])
-        tconf      = tf.zeros([nB, nH, nW])
-        tcls       = tf.zeros([nB, nH, nW])
+        conf_mask  = []
+        coord_mask = np.zeros([nB, nH, nW])
+        cls_mask   = np.zeros([nB, nH, nW])
+        tx0        = []
+        ty0        = []
+        tx1        = []
+        ty1        = []
+        tx2        = []
+        ty2        = []
+        tx3        = []
+        ty3        = []
+        tx4        = []
+        ty4        = []
+        tx5        = []
+        ty5        = []
+        tx6        = []
+        ty6        = []
+        tx7        = []
+        ty7        = []
+        tx8        = []
+        ty8        = []
+        tconf      = np.zeros([nB, nH, nW])
+        tcls       = np.zeros([nB, nH, nW])
 
         nAnchors = nH*nW
         nPixels  = nH*nW
@@ -317,8 +317,8 @@ class YOLO6D_net:
                 gx5/nW,gy5/nH,gx6/nW,gy6/nH,gx7/nW,gy7/nH,gx8/nW,gy8/nH]])
             cur_gt_corners = tf.transpose(tf.tile(cur_gt_corners, (nAnchors, 1)), (1, 0))  # 18 X 169
             cur_confs = tf.nn.relu(corner_confidences9(cur_pre_corners, cur_gt_corners))
-            temp = tf.reshape(tf.cast(cur_confs < sil_thresh, tf.float32), (nH, nW))
-            conf_mask[b] = conf_mask[b] * temp
+            temp = tf.reshape(tf.cast(cur_confs < sil_thresh, tf.float32), (nH, nW)) * noobject_scale
+            conf_mask.append(temp)  # a list
 
         nGT = 0
         nCorrect = 0
@@ -346,38 +346,66 @@ class YOLO6D_net:
             gx8 = target[b][17] * nW
             gy8 = target[b][18] * nH
 
-            best_n = 0
-            gt_box = [gx0/nW,gy0/nH,gx1/nW,gy1/nH,gx2/nW,gy2/nH,gx3/nW,gy3/nH,gx4/nW,gy4/nH,\
-                gx5/nW,gy5/nH,gx6/nW,gy6/nH,gx7/nW,gy7/nH,gx8/nW,gy8/nH]
-            gt_box = tf.convert_to_tensor(gt_box)
-            pred_box = pred_corners[b*nAnchors+best_n*nPixels+gj0*nW+gi0]
-            conf = corner_confidence9(gt_box, pred_box)
+            best_n = 0  # 1 anchor, single object
+            temp_location           = np.zeros([nH, nW])  # for tx0-8
+            temp_location[gj0][gi0] = 1
+            gt_box                  = [gx0/nW,gy0/nH,gx1/nW,gy1/nH,gx2/nW,gy2/nH,gx3/nW,gy3/nH,gx4/nW,gy4/nH,\
+                                       gx5/nW,gy5/nH,gx6/nW,gy6/nH,gx7/nW,gy7/nH,gx8/nW,gy8/nH]
+            gt_box                  = tf.convert_to_tensor(gt_box)
+            pred_box                = pred_corners[b*nAnchors+best_n*nPixels+gj0*nW+gi0] # [18,]
+            conf                    = corner_confidence9(gt_box, pred_box)
             coord_mask[b][gj0][gi0] = 1
             cls_mask[b][gj0][gi0]   = 1
-            conf_mask[b][gj0][gi0]  = object_scale
-            tx0[b][gj0][gi0]        = target[b][1] * nW - gi0
-            ty0[b][gj0][gi0]        = target[b][2] * nH - gj0
-            tx1[b][gj0][gi0]        = target[b][3] * nW - gi0
-            ty1[b][gj0][gi0]        = target[b][4] * nH - gj0
-            tx2[b][gj0][gi0]        = target[b][5] * nW - gi0
-            ty2[b][gj0][gi0]        = target[b][6] * nH - gj0
-            tx3[b][gj0][gi0]        = target[b][7] * nW - gi0
-            ty3[b][gj0][gi0]        = target[b][8] * nH - gj0
-            tx4[b][gj0][gi0]        = target[b][9] * nW - gi0
-            ty4[b][gj0][gi0]        = target[b][10] * nH - gj0
-            tx5[b][gj0][gi0]        = target[b][11] * nW - gi0
-            ty5[b][gj0][gi0]        = target[b][12] * nH - gj0
-            tx6[b][gj0][gi0]        = target[b][13] * nW - gi0
-            ty6[b][gj0][gi0]        = target[b][14] * nH - gj0
-            tx7[b][gj0][gi0]        = target[b][15] * nW - gi0
-            ty7[b][gj0][gi0]        = target[b][16] * nH - gj0
-            tx8[b][gj0][gi0]        = target[b][17] * nW - gi0
-            ty8[b][gj0][gi0]        = target[b][18] * nH - gj0
+            conf_temp               = np.ones([nH, nW])
+            conf_temp[gj0][gi0]     = object_scale
+            conf_mask[b]            = conf_mask[b] * conf_temp
+            tx0.append((target[b][1]  * nW - gi0) * temp_location)
+            ty0.append((target[b][2]  * nH - gj0) * temp_location)
+            tx1.append((target[b][3]  * nW - gi0) * temp_location)
+            ty1.append((target[b][4]  * nH - gj0) * temp_location)
+            tx2.append((target[b][5]  * nW - gi0) * temp_location)
+            ty2.append((target[b][6]  * nH - gj0) * temp_location)
+            tx3.append((target[b][7]  * nW - gi0) * temp_location)
+            ty3.append((target[b][8]  * nH - gj0) * temp_location)
+            tx4.append((target[b][9]  * nW - gi0) * temp_location)
+            ty4.append((target[b][10] * nH - gj0) * temp_location)
+            tx5.append((target[b][11] * nW - gi0) * temp_location)
+            ty5.append((target[b][12] * nH - gj0) * temp_location)
+            tx6.append((target[b][13] * nW - gi0) * temp_location)
+            ty6.append((target[b][14] * nH - gj0) * temp_location)
+            tx7.append((target[b][15] * nW - gi0) * temp_location)
+            ty7.append((target[b][16] * nH - gj0) * temp_location)
+            tx8.append((target[b][17] * nW - gi0) * temp_location)
+            ty8.append((target[b][18] * nH - gj0) * temp_location)
             tconf[b][gj0][gi0]      = conf
             tcls[b][gj0][gi0]       = target[b][21]
 
             if conf > 0.5:
                 nCorrect = nCorrect + 1
+
+        tx0        = tf.convert_to_tensor(tx0)
+        ty0        = tf.convert_to_tensor(ty0)
+        tx1        = tf.convert_to_tensor(tx1)
+        ty1        = tf.convert_to_tensor(ty1)
+        tx2        = tf.convert_to_tensor(tx2)
+        ty2        = tf.convert_to_tensor(ty2)
+        tx3        = tf.convert_to_tensor(tx3)
+        ty3        = tf.convert_to_tensor(ty3)
+        tx4        = tf.convert_to_tensor(tx4)
+        ty4        = tf.convert_to_tensor(ty4)
+        tx5        = tf.convert_to_tensor(tx5)
+        ty5        = tf.convert_to_tensor(ty5)
+        tx6        = tf.convert_to_tensor(tx6)
+        ty6        = tf.convert_to_tensor(ty6)
+        tx7        = tf.convert_to_tensor(tx7)
+        ty7        = tf.convert_to_tensor(ty7)
+        tx8        = tf.convert_to_tensor(tx8)
+        ty8        = tf.convert_to_tensor(ty8)
+        tconf      = tf.convert_to_tensor(tconf)
+        tcls       = tf.convert_to_tensor(tcls)
+        conf_mask  = tf.convert_to_tensor(conf_mask)
+        coord_mask = tf.convert_to_tensor(coord_mask)
+        cls_mask   = tf.convert_to_tensor(cls_mask)
 
         return nGT, nCorrect, coord_mask, conf_mask, cls_mask, tx0, tx1, tx2, tx3, tx4, tx5,\
              tx6, tx7, tx8, ty0, ty1, ty2, ty3, ty4, ty5, ty6, ty7, ty8, tconf, tcls

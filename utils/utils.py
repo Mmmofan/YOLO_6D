@@ -181,27 +181,30 @@ def corner_confidences9(gt_corners, pr_corners, th=80, sharpness=2, im_width=640
     return mean_conf
 
 def corner_confidence9(gt_corners, pr_corners, th=80, sharpness=2, im_width=640, im_height=480):
-    ''' gt_corners: Ground-truth 2D projections of the 3D bounding box corners, shape: (18,) type: list
-        pr_corners: Prediction for the 2D projections of the 3D bounding box corners, shape: (18,), type: list
+    ''' gt_corners: Ground-truth 2D projections of the 3D bounding box corners, shape: (18,) type: tensor
+        pr_corners: Prediction for the 2D projections of the 3D bounding box corners, shape: (18,), type: tensor
         th        : distance threshold, type: int
         sharpness : sharpness of the exponential that assigns a confidence value to the distance
         -----------
         return    : a list of shape (9,) with 9 confidence values 
     '''
     dist = gt_corners - pr_corners
+    image_size = tf.tile(tf.Variable([im_width, im_height], dtype=tf.float32), (9))
+    dist = dist * image_size
     dist = tf.reshape(dist, (9,2))
-    dist[:,0] = dist[:,0] * im_width
-    dist[:,1] = dist[:,1] * im_height
+    # dist[:,0] = dist[:,0] * im_width
+    # dist[:,1] = dist[:,1] * im_height
     eps = tf.constant(cfg.EPSILON)
     sharpness = tf.constant(sharpness)
     one = tf.constant(1.0)
     th = tf.constant(th)
 
-    dist = tf.sqrt(tf.reduce_sum(tf.square(dist), 1))
-    mask = tf.cast(dist < th, tf.float32)
-    conf = tf.exp(sharpness * (one - dist/th)) - one
+    dist  = tf.sqrt(tf.reduce_sum(tf.square(dist), 1))  # [9,]
+    mask  = tf.cast(dist < th, tf.float32)
+    conf  = tf.exp(sharpness * (one - dist/th)) - one
     conf0 = tf.exp(sharpness * (one - tf.zeros_like(dist))) - one + eps
-    conf = mask * conf
+    conf  = conf / conf0
+    conf  = mask * conf
     return tf.reduce_mean(conf)
 
 def get_predict_boxes(output, num_classes):
