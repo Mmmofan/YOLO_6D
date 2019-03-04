@@ -180,7 +180,7 @@ class YOLO6D_net:
             x8  = tf.reshape(output[:,:,:,16], (nB, nH, nW))
             y8  = tf.reshape(output[:,:,:,17], (nB, nH, nW))
             conf = tf.reshape(tf.nn.sigmoid(output[:,:,:,18]), (nB, nH, nW))
-            cls  = tf.reshape(output[:,:,:,19], (nB, nH, nW))
+            # cls  = tf.reshape(output[:,:,:,19], (nB, nH, nW))
 
             # Create pred boxes
             pred_corners = np.zeros([18, nB*nH*nW], dtype=np.float32)  # [18, batch*169]
@@ -211,13 +211,13 @@ class YOLO6D_net:
             # Build targets
             nGT, nCorrect, coord_mask, conf_mask, cls_mask, tx0, tx1, tx2, tx3, tx4, tx5, tx6, tx7, tx8, ty0, ty1, ty2, ty3, ty4, ty5, ty6, ty7, ty8, tconf, tcls = \
                 self.build_targets(pred_corners, target, nC, nH, nW, self.noobj_scale, self.obj_scale, self.thresh)
-            cls_mask  = (cls_mask == 1)
+            # cls_mask  = (cls_mask == 1)
             # nProposals = int((conf > 0.25))
 
-            tcls      = tcls[cls_mask]
+            # tcls      = tf.reshape(tcls, (-1))[cls_mask]
             conf_mask = tf.sqrt(conf_mask)
-            cls_mask  = tf.tile(tf.reshape(cls_mask, (-1, 1)), 1, nC)
-            cls       = tf.reshape(cls[cls_mask], (-1, nC))
+            # cls_mask  = tf.tile(tf.reshape(cls_mask, (-1, 1)), 1, nC)
+            # cls       = tf.reshape(cls[cls_mask], (-1, nC))
 
             # Create loss
             loss       = []
@@ -378,7 +378,7 @@ class YOLO6D_net:
             tx8.append((target[b][17] * nW - gi0) * temp_location)
             ty8.append((target[b][18] * nH - gj0) * temp_location)
             tconf[b][gj0][gi0]      = conf
-            tcls[b][gj0][gi0]       = target[b][21]
+            tcls[b][gj0][gi0]       = target[b][0]
 
             if conf > 0.5:
                 nCorrect = nCorrect + 1
