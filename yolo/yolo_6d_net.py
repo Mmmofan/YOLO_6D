@@ -327,8 +327,8 @@ class YOLO6D_net:
             best_n = -1
             gx0 = target[b][1] * nW
             gy0 = target[b][2] * nH
-            gi0 = int(gx0)
-            gj0 = int(gy0)
+            gi0 = tf.cast(gx0, tf.uint16)
+            gj0 = tf.cast(gy0, tf.uint16)
             gx1 = target[b][3] * nW
             gy1 = target[b][4] * nH
             gx2 = target[b][5] * nW
