@@ -56,7 +56,7 @@ class Linemod(object):
 
     def prepare(self, phase):
         """
-        self.imgname: A list of all training image files path
+        self.imgname:   A list of all training image files path
         self.gt_labels: A list of all ground true labels(which elements are lists like [[1,xx,xx,...],[1,xx,xx,...]] with integer and float numbers)
         these two matched respectively
         self.bg_files: A list of VOC images path
@@ -93,15 +93,15 @@ class Linemod(object):
             images[idx], labels[idx] = self.load_data_detection(self.imgname[idx + self.batch * self.batch_size], (416, 416),
                                                    jitter, hue, saturation, exposure, bgpath)
 
-        images = tf.convert_to_tensor(images)
-        labels = tf.convert_to_tensor(labels)
+        images = np.array(images)
+        labels = np.array(labels)
 
         self.batch += 1
         return images, labels
 
-    # def next_batches_test(self):
-        # images = np.zeros((self.batch_size, 416, 416, 3), np.float32)
-        # labels = np.zeros((self.batch_size, 13, 13, 32), np.float32)
+    def next_batches_test(self):
+        images = np.zeros((self.batch_size, 416, 416, 3), np.float32)
+        labels = np.zeros((self.batch_size, 13, 13, 32), np.float32)
 
         # random_num = random.randint(1, 10)
         # if random_num > 5:

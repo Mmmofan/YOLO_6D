@@ -151,8 +151,8 @@ class YOLO6D_net:
 
     def Region_Loss(self, output, target, scope='Loss'):
         """
-        output: output from net, [batch, cell, cell, 20]
-        target: ground truth, [batch, 21]
+        output: output from net, [batch, cell, cell, 20], type: tf.tensor
+        target: ground truth, [batch, 21], type: np.array
         """
         shape = output.get_shape()
         nB = self.Batch_Size
@@ -256,8 +256,8 @@ class YOLO6D_net:
 
     def build_targets(self, pred_corners, target, num_classes, nH, nW, noobject_scale, object_scale, sil_thresh):
         """
-        pred_corners:   [(nB X 169), 18]
-        target:         [nB, 21]
+        pred_corners:   [(nB X 169), 18], type: tf.tensor
+        target:         [nB, 21], type: np.array
         num_classes:    1
         nH:             13
         nW:             13

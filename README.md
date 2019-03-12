@@ -68,7 +68,7 @@ to see the result and accuracy.
 ---
 
 ### Problems and prograss
-I finish the pre-train step (it gets good accuracy on classification), but in training, I didn't get such a good result, the **coordinates loss** has been down to 0.0x level, but predict coordinates are even can't perfectly match the ground truth, I think loss function may be on blame, I suggest any one who is interest iin this repo can check the loss function in [yolo/yolo_6d_net.py](https://github.com/Mmmofan/YOLO_6D/blob/master/yolo/yolo_6d_net.py)
+I finish the pre-train step (it gets good accuracy on classification), but in training, I didn't get such a good result, the **coordinates loss** has been down to 0.0x level, but predict coordinates are even can't perfectly match the ground truth, I think loss function may be on blame, I am rewriting it by duplicating PyTorch version (directly duplicate can't be running so I changed a lot).
 If you find any incorrect of code, please send me an email [cokespace2@gmail.com](cokespace2@gmail.com), I will be very appreciate that.
 The *valid.py* file is not finished yet, it now just to check whether pictures is predicted correctly.
 Also, I just test the model using single object, the occlusion part will be later uploaded to this repo
