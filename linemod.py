@@ -79,7 +79,7 @@ class Linemod(object):
 
     def next_batches(self):
         images   = np.zeros((self.batch_size, 416, 416, 3), np.float32)
-        gt_label = np.zeros((self.batch_size, 1050), np.float32)
+        gt_label = np.zeros((self.batch_size, 21), np.float32)
         labels   = np.zeros((self,batch_size, 13, 13, 20), np.float32)
 
         jitter     = 0.2
@@ -220,7 +220,7 @@ class Linemod(object):
         return img, flip, dx,dy,sx,sy
 
     def fill_truth_detection(self, labpath, w, h, flip, dx, dy, sx, sy):
-        max_boxes = 50
+        max_boxes = 1
         label = np.zeros((max_boxes,21))
         if os.path.getsize(labpath):
             bs = np.loadtxt(labpath)
