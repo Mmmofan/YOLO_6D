@@ -78,8 +78,9 @@ class Linemod(object):
             print('\n   Wrong phase...\n   Try again...')
 
     def next_batches(self):
-        images = np.zeros((self.batch_size, 416, 416, 3), np.float32)
-        labels = np.zeros((self.batch_size, 1050), np.float32)
+        images   = np.zeros((self.batch_size, 416, 416, 3), np.float32)
+        gt_label = np.zeros((self.batch_size, 1050), np.float32)
+        labels   = np.zeros((self,batch_size, 13, 13, 20), np.float32)
 
         jitter     = 0.2
         hue        = 0.1
@@ -90,30 +91,65 @@ class Linemod(object):
         bgpath = self.bg_files[random_bg_index]
 
         for idx in range(self.batch_size):
-            images[idx], labels[idx] = self.load_data_detection(self.imgname[idx + self.batch * self.batch_size], (416, 416),
+            images[idx], gt_label[idx] = self.load_data_detection(self.imgname[idx + self.batch * self.batch_size], (416, 416),
                                                    jitter, hue, saturation, exposure, bgpath)
+            labels[idx] = self.get_label(gt_label[idx])
 
-        images = np.array(images)
-        labels = np.array(labels)
+        images   = np.array(images) # nB X 416 X 416 X 3
+        gt_label = np.array(gt_label) # nB X 21
+        labels   = np.array(labels)   # nB X 13 X 13 X 20
 
         self.batch += 1
-        return images, labels
+        return images, gt_label, labels
 
-    def next_batches_test(self):
-        images = np.zeros((self.batch_size, 416, 416, 3), np.float32)
-        labels = np.zeros((self.batch_size, 13, 13, 32), np.float32)
+    def get_label(self, label):
+        # label: [21, ]
+        output = np.zeros([13, 13, 20], np.float32)
+        nW, nH = 13, 13
+        x0  = label[1]
+        y0  = label[2]
+        gx0 = int(x0)
+        gy0 = int(y0)
+        x1  = label[3]
+        y1  = label[4]
+        x2  = label[5]
+        y2  = label[6]
+        x3  = label[7]
+        y3  = label[8]
+        x4  = label[9]
+        y4  = label[10]
+        x5  = label[11]
+        y5  = label[12]
+        x6  = label[13]
+        y6  = label[14]
+        x7  = label[15]
+        y7  = label[16]
+        x8  = label[17]
+        y8  = label[18]
+        cls = label[0]
 
-        # random_num = random.randint(1, 10)
-        # if random_num > 5:
-            # flip = True
-        # else:
-            # flip = False
+        output[gx0][gy0][0]  = 1
+        output[gx0][gy0][1]  = x0 * nW - gx0
+        output[gx0][gy0][2]  = y0 * nH - gy0
+        output[gx0][gy0][3]  = x1 * nW - gx0
+        output[gx0][gy0][4]  = y1 * nH - gy0
+        output[gx0][gy0][5]  = x2 * nW - gx0
+        output[gx0][gy0][6]  = y2 * nH - gy0
+        output[gx0][gy0][7]  = x3 * nW - gx0
+        output[gx0][gy0][8]  = y3 * nH - gy0
+        output[gx0][gy0][9]  = x4 * nW - gx0
+        output[gx0][gy0][10] = y4 * nH - gy0
+        output[gx0][gy0][11] = x5 * nW - gx0
+        output[gx0][gy0][12] = y5 * nH - gy0
+        output[gx0][gy0][13] = x6 * nW - gx0
+        output[gx0][gy0][14] = y6 * nH - gy0
+        output[gx0][gy0][15] = x7 * nW - gx0
+        output[gx0][gy0][16] = y7 * nH - gy0
+        output[gx0][gy0][17] = x8 * nW - gx0
+        output[gx0][gy0][18] = y8 * nH - gy0
+        output[gx0][gy0][19] = cls
 
-        # for idx in range(self.batch_size):
-            # images[idx] = self.image_bg_replace(self.imgname[idx+self.batch*self.batch_size][-8:-3], flip)
-            # labels[idx] = self.label_read(self.gt_labels[idx + self.batch * self.batch_size], flip)
-
-        # return images, labels
+        return output
 
     def scale_image_channel(self, im, c, v):
         cs = list(im.split())

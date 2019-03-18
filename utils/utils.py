@@ -144,7 +144,6 @@ def get_max_index(confidence):
     max_val  = tf.reduce_max(confidence)
     bool_idx = tf.equal(confidence, max_val)
     int_idx  = tf.where(bool_idx)
-    assert(int_idx.get_shape()[1]==2)
     maxi = int_idx[0, 0]
     maxj = int_idx[0, 1]
     return maxi, maxj
@@ -180,24 +179,25 @@ def corner_confidences9(gt_corners, pr_corners, th=80, sharpness=2, im_width=640
     mean_conf = tf.reduce_mean(conf, 1)
     return mean_conf
 
-def corner_confidence9(gt_corners, pr_corners, th=80, sharpness=2, im_width=640, im_height=480):
+def corner_confidence9(gt_corners, pr_corners, th=80, sharpness=2.0, im_width=640, im_height=480):
     ''' gt_corners: Ground-truth 2D projections of the 3D bounding box corners, shape: (18,) type: tensor
         pr_corners: Prediction for the 2D projections of the 3D bounding box corners, shape: (18,), type: tensor
         th        : distance threshold, type: int
         sharpness : sharpness of the exponential that assigns a confidence value to the distance
         -----------
-        return    : a list of shape (9,) with 9 confidence values 
+        return    : a list of shape (9,) with 9 confidence values
     '''
-    dist = gt_corners - pr_corners
-    image_size = tf.tile(tf.Variable([im_width, im_height], dtype=tf.float32), (9))
-    dist = dist * image_size
+    dist = gt_corners - pr_corners  # (18,)
+    image_size = tf.Variable([im_width, im_height], dtype=tf.float32)
+    image_size = tf.reshape(image_size, (1, 2))
+    image_size = tf.tile(image_size, (9,1))
     dist = tf.reshape(dist, (9,2))
-    # dist[:,0] = dist[:,0] * im_width
-    # dist[:,1] = dist[:,1] * im_height
+    dist = dist * image_size  # 9 X 2
+
     eps = tf.constant(cfg.EPSILON)
     sharpness = tf.constant(sharpness)
     one = tf.constant(1.0)
-    th = tf.constant(th)
+    th = tf.constant(th, dtype=tf.float32)
 
     dist  = tf.sqrt(tf.reduce_sum(tf.square(dist), 1))  # [9,]
     mask  = tf.cast(dist < th, tf.float32)
