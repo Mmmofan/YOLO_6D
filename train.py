@@ -64,7 +64,7 @@ class Solver(object):
         if arg.pre:
             self.variable_to_restore = tf.global_variables()[:-2]
         else:
-            self.variable_to_restore = tf.global_variables()[:-2]
+            self.variable_to_restore = tf.global_variables()[:-10]
 
         self.variable_to_save = tf.global_variables()
         self.restorer = tf.train.Saver(self.variable_to_restore, max_to_keep=3)
@@ -88,14 +88,21 @@ class Solver(object):
         # self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate).minimize(
             # self.net.total_loss[0], global_step=self.global_step)
 
+        gpu_options = tf.GPUOptions(allow_growth=True)
+        config = tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True)
+        self.sess = tf.Session(config=config)
+
+        # self.sess.run(tf.global_variables_initializer())
+        self.sess.run(self.global_step.initializer)
+        trainable = tf.trainable_variables()
+        for i in range(len(trainable)-8):
+            self.sess.run(trainable[i].initializer)
+
         self.ema = tf.train.ExponentialMovingAverage(decay=0.999)
         self.averages_op = self.ema.apply(tf.trainable_variables())
         with tf.control_dependencies([self.optimizer]):
             self.train_op = tf.group(self.averages_op)
-        gpu_options = tf.GPUOptions(allow_growth=True)
-        config = tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True)
-        self.sess = tf.Session(config=config)
-        self.sess.run(tf.global_variables_initializer())
+
         if self.weight_file is not None:
             print('\n----------Restoring weights from: {}------batch: {}--'.format(self.weight_file, self.batch_size))
             self.restorer.restore(self.sess, self.weight_file)
@@ -115,7 +122,7 @@ class Solver(object):
                 images, gt_label, labels = self.data.next_batches()
                 load_timer.toc()
 
-                feed_dict = {self.net.input_images: images, self.net.gt_label: gt_label, self.net.labels: labels}
+                feed_dict = {self.net.input_images: images, self.net.target: gt_label, self.net.labels: labels}
 
                 if step % self.summary_iter == 0:
                     if step % (self.summary_iter * 4) == 0:
@@ -167,7 +174,7 @@ class Solver(object):
 
                 else:
                     train_timer.tic()
-                    output, loss,  _ = self.sess.run([self.net.logit, self.net.total_loss, self.train_op], feed_dict=feed_dict)
+                    self.sess.run(self.train_op, feed_dict=feed_dict)
                     train_timer.toc()
 
                 if step % self.save_iter == 0:

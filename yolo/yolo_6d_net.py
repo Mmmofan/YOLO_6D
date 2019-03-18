@@ -50,9 +50,9 @@ class YOLO6D_net:
 
         if self.is_training:
             self.gt_conf    = None
-            self.gt_label   = tf.placeholder(tf.float32, [None, 21], name='gt_label')
             self.labels     = tf.placeholder(tf.float32, [None, self.cell_size, self.cell_size, 20], name='labels')
-            self.total_loss = self.Region_Loss(self.logit, self.gt_label, self.labels)
+            self.target     = tf.placeholder(tf.float32, [None, 21], name='target')
+            self.total_loss = self.Region_Loss(self.logit, self.target, self.labels)
             # self.total_loss = self.loss_layer(self.logit, self.labels)
             tf.summary.tensor_summary('Total loss', self.total_loss)
 
