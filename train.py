@@ -112,10 +112,10 @@ class Solver(object):
         while epoch <= self.epoch:
             for step in range(1, self.max_iter-1):
                 load_timer.tic()
-                images, labels = self.data.next_batches()
+                images, gt_label, labels = self.data.next_batches()
                 load_timer.toc()
 
-                feed_dict = {self.net.input_images: images, self.net.labels: labels}
+                feed_dict = {self.net.input_images: images, self.net.gt_label: gt_label, self.net.labels: labels}
 
                 if step % self.summary_iter == 0:
                     if step % (self.summary_iter * 4) == 0:
