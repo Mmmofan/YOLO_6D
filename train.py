@@ -88,20 +88,20 @@ class Solver(object):
         # self.optimizer = tf.train.GradientDescentOptimizer(learning_rate=self.learning_rate).minimize(
             # self.net.total_loss[0], global_step=self.global_step)
 
-        gpu_options = tf.GPUOptions(allow_growth=True)
-        config = tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True)
-        self.sess = tf.Session(config=config)
-
-        # self.sess.run(tf.global_variables_initializer())
-        self.sess.run(self.global_step.initializer)
-        trainable = tf.trainable_variables()
-        for i in range(len(trainable)-8):
-            self.sess.run(trainable[i].initializer)
-
         self.ema = tf.train.ExponentialMovingAverage(decay=0.999)
         self.averages_op = self.ema.apply(tf.trainable_variables())
         with tf.control_dependencies([self.optimizer]):
             self.train_op = tf.group(self.averages_op)
+
+        gpu_options = tf.GPUOptions(allow_growth=True)
+        config = tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True)
+        self.sess = tf.Session(config=config)
+
+        self.sess.run(tf.global_variables_initializer())
+        # self.sess.run(self.global_step.initializer)
+        # trainable = tf.trainable_variables()
+        # for i in range(len(trainable)-8):
+            # self.sess.run(trainable[i].initializer)
 
         if self.weight_file is not None:
             print('\n----------Restoring weights from: {}------batch: {}--'.format(self.weight_file, self.batch_size))

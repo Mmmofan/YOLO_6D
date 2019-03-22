@@ -44,14 +44,13 @@ class YOLO6D_net:
         self.boundry_1 = 9 * 2   ## Seperate coordinates
         self.boundry_2 = self.num_class
 
-        self.input_images = tf.placeholder(tf.float32, [None, self.image_size, self.image_size, 3], name='images')
+        self.input_images = tf.placeholder(tf.float32, [self.Batch_Size, self.image_size, self.image_size, 3], name='images')
 
         self.logit = self.build_networks(self.input_images)
 
         if self.is_training:
-            self.gt_conf    = None
-            self.labels     = tf.placeholder(tf.float32, [None, self.cell_size, self.cell_size, 20], name='labels')
-            self.target     = tf.placeholder(tf.float32, [None, 21], name='target')
+            self.labels     = tf.placeholder(tf.float32, [self.Batch_Size, self.cell_size, self.cell_size, 20], name='labels')
+            self.target     = tf.placeholder(tf.float32, [self.Batch_Size, 21], name='target')
             self.total_loss = self.Region_Loss(self.logit, self.target, self.labels)
             # self.total_loss = self.loss_layer(self.logit, self.labels)
             tf.summary.tensor_summary('Total loss', self.total_loss)
@@ -157,7 +156,7 @@ class YOLO6D_net:
         labels: ground truth, [batch, cell, cell, 19] type: tf.tensor
         """
         shape = output.get_shape()
-        nB = self.Batch_Size
+        nB = shape[0].value
         nC = 1
         nH = shape[1].value
         nW = shape[2].value
@@ -263,7 +262,7 @@ class YOLO6D_net:
         sil_thresh:     0.6
         """
         nB = self.Batch_Size
-        nC = num_classes
+        # nC = num_classes
         conf_mask  = []
         coord_mask = []
         cls_mask   = []
