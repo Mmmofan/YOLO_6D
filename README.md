@@ -1,4 +1,17 @@
 # Yolo 6d (singleshotposeestimate)
+
+I am glad that someone email me to discuss this algorithm but I have to say sorry that I can't make ckpt files shared.
+
+Also this repo is not what it mean to be (I fixed bugs but didn't commit), so you may not run it directly.
+
+Any question about the detail of this repo is welcomed and I will reply soon, but NOT ask for ckpt files :-)
+
+Enjoy it.
+
+Fan, June 11th, 2019
+
+---
+
 Repoducibility of the following paper:
 
 [Bugra Tekin, Sudipta N. Sinha and Pascal Fua, "Real-Time Seamless Single Shot 6D Object Pose Prediction", CVPR 2018.](https://arxiv.org/pdf/1711.08848.pdf)
