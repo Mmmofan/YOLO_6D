@@ -34,7 +34,6 @@ from utils.utils import (
 class Solver(object):
 
     def __init__(self, net, data, arg=None):
-
         # Set parameters for training and testing
         self.meshname = data.meshname
         self.backupdir = data.backupdir
@@ -345,7 +344,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--datacfg', default='cfg/ape.data', type=str)
     parser.add_argument('--pre', default=False, type=bool)
-    parser.add_argument('--gpu', default='2', type=str)
+    parser.add_argument('--gpu', default='0', type=str)
     parser.add_argument('--data_dir', default="data", type=str)
     parser.add_argument('--weights', default="yolo_6d.ckpt", type=str)
     parser.add_argument('--batch', default=0, type=int)

@@ -148,7 +148,7 @@ def get_max_index(confidence):
     maxj = int_idx[0, 1]
     return maxi, maxj
 
-def corner_confidences9(gt_corners, pr_corners, th=80, sharpness=2, im_width=640, im_height=480):
+def corner_confidences9(gt_corners, pr_corners, th=80, sharpness=2.0, im_width=640, im_height=480):
     """
     gt_corners: Ground-truth 2D projections of the 3D bounding box corners, shape: (18 x 169)
     pr_corners: Prediction for the 2D projections of the 3D bounding box corners, shape: (18 x 169)
@@ -165,10 +165,10 @@ def corner_confidences9(gt_corners, pr_corners, th=80, sharpness=2, im_width=640
     distthresh = tf.constant(th, dtype=tf.float32)
 
     dist = gt_corners - pr_corners
-    dist = tf.reshape(tf.transpose(dist, (1,0)), (nA, 9, 2))
-    dist_x = dist[:, :, 0] * im_width
-    dist_y = dist[:, :, 1] * im_height
-    dist = tf.transpose(tf.stack([dist_x, dist_y]), (1,2,0))
+    dist = tf.reshape(tf.transpose(dist, (1, 0)), (nA, 9, 2))
+    dist_x = dist[:, :, 0] * im_height # (nA, 9), in image size
+    dist_y = dist[:, :, 1] * im_width
+    dist = tf.transpose(tf.stack([dist_x, dist_y]), (1, 2, 0))
 
     dist = tf.sqrt(tf.reduce_sum(tf.square(dist), 2))  # nA X 9
     mask = tf.cast(dist < th, tf.float32)
@@ -176,7 +176,7 @@ def corner_confidences9(gt_corners, pr_corners, th=80, sharpness=2, im_width=640
     conf0 = tf.exp(sharpness * (one - tf.zeros_like(dist))) - one + eps
     conf = conf / conf0
     conf = mask * conf  # nA X 9
-    mean_conf = tf.reduce_mean(conf, 1)
+    mean_conf = tf.reduce_mean(conf, 1) # (nA,)
     return mean_conf
 
 def corner_confidence9(gt_corners, pr_corners, th=80, sharpness=2.0, im_width=640, im_height=480):
@@ -188,7 +188,7 @@ def corner_confidence9(gt_corners, pr_corners, th=80, sharpness=2.0, im_width=64
         return    : a list of shape (9,) with 9 confidence values
     '''
     dist = gt_corners - pr_corners  # (18,)
-    image_size = tf.Variable([im_width, im_height], dtype=tf.float32)
+    image_size = tf.Variable([im_width, im_height], dtype=tf.float32, trainable=False)
     image_size = tf.reshape(image_size, (1, 2))
     image_size = tf.tile(image_size, (9,1))
     dist = tf.reshape(dist, (9,2))

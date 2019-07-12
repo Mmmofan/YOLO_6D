@@ -213,7 +213,7 @@ class YOLO6D_net:
             pred_corners = tf.reshape(tf.transpose(pred_corners, (0,1)), (-1, 18))  #(nB X 169) X 18
 
             # Build targets
-            nGT, nCorrect, coord_mask, conf_mask, cls_mask, tx0, tx1, tx2, tx3, tx4, tx5, tx6, tx7, tx8, ty0, ty1, ty2, ty3, ty4, ty5, ty6, ty7, ty8, tconf, tcls = \
+            nGT, nCorrect, coord_mask, conf_mask, cls_mask, tx0, tx1, tx2, tx3, tx4, tx5, tx6, tx7, tx8, ty0, ty1, ty2, ty3, ty4, ty5, ty6, ty7, ty8, tconf = \
                 self.build_targets(pred_corners, target, labels, nC, nH, nW, self.noobj_scale, self.obj_scale, self.thresh)
             conf_mask = tf.sqrt(conf_mask)
 
@@ -249,6 +249,7 @@ class YOLO6D_net:
             loss.append(loss_conf)
             loss.append(loss_coord)
             loss.append(loss_cls)
+        loss = tf.convert_to_tensor(loss)
 
         return loss
 
@@ -289,7 +290,6 @@ class YOLO6D_net:
         ty7        = labels[:,:,:,16]
         tx8        = labels[:,:,:,17]
         ty8        = labels[:,:,:,18]
-        tcls       = labels[:,:,:,19]
 
         nAnchors = nH*nW
         nPixels  = nH*nW
@@ -325,32 +325,32 @@ class YOLO6D_net:
         for b in range(nB):
             nGT = nGT + 1
             best_n = -1
-            gx0 = target[b][1]  * nW
-            gy0 = target[b][2]  * nH
-            gx1 = target[b][3]  * nW
-            gy1 = target[b][4]  * nH
-            gx2 = target[b][5]  * nW
-            gy2 = target[b][6]  * nH
-            gx3 = target[b][7]  * nW
-            gy3 = target[b][8]  * nH
-            gx4 = target[b][9]  * nW
-            gy4 = target[b][10] * nH
-            gx5 = target[b][11] * nW
-            gy5 = target[b][12] * nH
-            gx6 = target[b][13] * nW
-            gy6 = target[b][14] * nH
-            gx7 = target[b][15] * nW
-            gy7 = target[b][16] * nH
-            gx8 = target[b][17] * nW
-            gy8 = target[b][18] * nH
+            gx0 = target[b][1] # tensor with shape (1,)
+            gy0 = target[b][2]
+            gx1 = target[b][3]
+            gy1 = target[b][4]
+            gx2 = target[b][5]
+            gy2 = target[b][6]
+            gx3 = target[b][7]
+            gy3 = target[b][8]
+            gx4 = target[b][9]
+            gy4 = target[b][10]
+            gx5 = target[b][11]
+            gy5 = target[b][12]
+            gx6 = target[b][13]
+            gy6 = target[b][14]
+            gx7 = target[b][15]
+            gy7 = target[b][16]
+            gx8 = target[b][17]
+            gy8 = target[b][18]
             gi0, gj0 = get_max_index(response[b])
 
             best_n = 0  # 1 anchor, single object
             temp_location           = response[b]  # [nW, nH]
-            gt_box                  = tf.convert_to_tensor([gx0/nW,gy0/nH,gx1/nW,gy1/nH,gx2/nW,gy2/nH,gx3/nW,gy3/nH,gx4/nW,gy4/nH,\
-                                       gx5/nW,gy5/nH,gx6/nW,gy6/nH,gx7/nW,gy7/nH,gx8/nW,gy8/nH])
-            pred_box                = pred_corners[b*nAnchors+best_n*nPixels+gj0*nW+gi0] # [18,]
-            conf                    = corner_confidence9(gt_box, pred_box)
+            gt_box                  = tf.convert_to_tensor([gx0, gy0, gx1, gy1, gx2, gy2, gx3, gy3, gx4, gy4,\
+                                       gx5, gy5, gx6, gy6, gx7, gy7, gx8, gy8]) # (18, )
+            pred_box                = pred_corners[b * nAnchors + gi0 * nW + gj0] # (18, )
+            conf                    = corner_confidence9(gt_box, pred_box) # (1, )
             coord_mask.append(temp_location)
             cls_mask.append(temp_location)
             # conf_temp               = np.ones([nH, nW])
@@ -369,7 +369,7 @@ class YOLO6D_net:
         cls_mask   = tf.convert_to_tensor(cls_mask)
 
         return nGT, nCorrect, coord_mask, conf_mask, cls_mask, tx0, tx1, tx2, tx3, tx4, tx5,\
-             tx6, tx7, tx8, ty0, ty1, ty2, ty3, ty4, ty5, ty6, ty7, ty8, tconf, tcls
+             tx6, tx7, tx8, ty0, ty1, ty2, ty3, ty4, ty5, ty6, ty7, ty8, tconf
 
 
     def loss_layer(self, predicts, labels, scope='Loss_layer'):
