@@ -3,6 +3,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.pyc[cod]
+.vscode/
+multi_obj_pose_estimation/
 
 *.pyc
 *.jpg

@@ -3,7 +3,6 @@
 # ---------------------
 # using Linemod dataset for training and testing
 # @Author: Fan, Mo
-# @Email: fmo@nullmax.ai
 # ---------------------
 
 import os
@@ -11,8 +10,11 @@ import random
 import numpy as np
 from PIL import Image, ImageChops, ImageMath
 
-import yolo.config as cfg
-from utils.utils import *
+import config as cfg
+from utils.utils import (
+    get_all_files,
+    read_data_cfg,
+)
 
 
 

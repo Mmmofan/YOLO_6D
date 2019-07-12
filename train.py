@@ -3,7 +3,6 @@
 # ---------------------
 # solver file for yolo-6d
 # @Author: Fan, Mo
-# @Email: fmo@nullmax.ai
 # ---------------------
 
 from __future__ import print_function
@@ -16,19 +15,27 @@ import os
 import numpy as np
 import tensorflow as tf
 
-import yolo.config as cfg
+from yolo_6d_net import YOLO6D_net
+import config as cfg
 from linemod import Linemod
 from utils.MeshPly import MeshPly
 from utils.timer import Timer
-from utils.utils import *
-from yolo.yolo_6d_net import YOLO6D_net
+from utils.utils import (
+    get_predict_boxes,
+    calcAngularDistance,
+    compute_transformation,
+    compute_projection,
+    pnp,
+    get_3D_corners,
+    get_camera_intrinsic
+)
 
 
 class Solver(object):
 
     def __init__(self, net, data, arg=None):
 
-        #Set parameters for training and testing
+        # Set parameters for training and testing
         self.meshname = data.meshname
         self.backupdir = data.backupdir
         self.vx_threshold = data.vx_threshold

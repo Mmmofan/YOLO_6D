@@ -11,7 +11,7 @@ import cv2
 import numpy as np
 import tensorflow as tf
 
-import yolo.config as cfg
+import config as cfg
 
 
 def sigmoid_func(x, derivative=False):
