@@ -103,7 +103,9 @@ class Solver(object):
         config = tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True)
         self.sess = tf.Session(config=config)
 
-        self.sess.run(tf.global_variables_initializer())
+        self.trainable_variables = tf.trainable_variables()
+        self.init_op = tf.variables_initializer(tf)
+        # self.sess.run(tf.global_variables_initializer())
         # self.sess.run(self.global_step.initializer)
         # trainable = tf.trainable_variables()
         # for i in range(len(trainable)-8):
