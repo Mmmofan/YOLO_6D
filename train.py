@@ -30,9 +30,7 @@ from utils.utils import (
     get_camera_intrinsic
 )
 
-
 class Solver(object):
-
     def __init__(self, net, data, arg=None):
         # Set parameters for training and testing
         self.meshname = data.meshname
@@ -115,7 +113,6 @@ class Solver(object):
             print('\n----------Restoring weights from: {}------batch: {}--'.format(self.weight_file, self.batch_size))
             self.restorer.restore(self.sess, self.weight_file)
         self.writer.add_graph(self.sess.graph)
-
 
     def train(self):
         self.net.evaluation_off()
@@ -342,9 +339,9 @@ def update_config_paths(data_dir, weights_file):
     cfg.WEIGHTS_FILE = os.path.join(cfg.WEIGHTS_DIR, weights_file)
 
 
-def main():
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--datacfg', default='cfg/ape.data', type=str)
+    parser.add_argument('--datacfg', default='cfg'+os.sep+'ape.data', type=str)
     parser.add_argument('--pre', default=False, type=bool)
     parser.add_argument('--gpu', default='0', type=str)
     parser.add_argument('--data_dir', default="data", type=str)
@@ -354,7 +351,6 @@ def main():
 
     if len(args.datacfg) == 0:
         print('No datacfg file specified')
-        return
 
     if args.pre:
         print("Pre-training... ")
@@ -379,6 +375,3 @@ def main():
     print("All training time: {}h".format((toc - tic) / 3600.0))
     print("------------------------------training end-----------------------------\n")
 
-if __name__ == "__main__":
-
-    main()

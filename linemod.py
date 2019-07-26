@@ -16,11 +16,7 @@ from utils.utils import (
     read_data_cfg,
 )
 
-
-
-
 class Linemod(object):
-
     def __init__(self, phase, arg=None):
         # Set parameters for training and testing
         self.data_options = read_data_cfg(arg)
@@ -66,43 +62,36 @@ class Linemod(object):
         if phase == 'train':
             with open(self.trainlist, 'r') as f:
                 self.imgname = [x.strip() for x in f.readlines()]  # a list of trianing files
-
             if self.shuffle:
                 random.shuffle(self.imgname)
-
             self.bg_files = get_all_files('VOCdevkit/VOC2012/JPEGImages')
-
         elif phase == 'test':
             with open(self.testlist, 'r') as f:
                 self.imgname = [x.strip() for x in f.readlines()]
-
         else:
-            print('\n   Wrong phase...\n   Try again...')
+            raise Exception('\n   Wrong phase...\n   Try again...')
 
     def next_batches(self):
         images   = np.zeros((self.batch_size, 416, 416, 3), np.float32)
-        gt_label = np.zeros((self.batch_size, 21), np.float32)
-        labels   = np.zeros((self.batch_size, 13, 13, 20), np.float32)
-
+        labels   = np.zeros((self.batch_size, 13, 13, 19), np.float32)
+        # some parameters for data augmentation
         jitter     = 0.2
         hue        = 0.1
         saturation = 1.5
         exposure   = 1.5
 
-        random_bg_index = random.randint(0, len(self.bg_files) - 1)
-        bgpath = self.bg_files[random_bg_index]
+        bgpath = self.bg_files[random.randint(0, len(self.bg_files) - 1)]
 
         for idx in range(self.batch_size):
-            images[idx], gt_label[idx] = self.load_data_detection(self.imgname[idx + self.batch * self.batch_size], (416, 416),
+            images[idx] = self.load_data_detection(self.imgname[idx + self.batch * self.batch_size], (416, 416),
                                                    jitter, hue, saturation, exposure, bgpath)
-            labels[idx] = self.get_label(gt_label[idx])
+            labels[idx] = self.get_label(self.imgname[idx + self.batch * self.batch_size])
 
         images   = np.array(images) # nB X 416 X 416 X 3
-        gt_label = np.array(gt_label) # nB X 21
         labels   = np.array(labels)   # nB X 13 X 13 X 20
 
         self.batch += 1
-        return images, gt_label, labels
+        return images, labels
 
     def get_label(self, label):
         # label: [21, ]
@@ -153,12 +142,7 @@ class Linemod(object):
 
         return output
 
-    def scale_image_channel(self, im, c, v):
-        cs = list(im.split())
-        cs[c] = cs[c].point(lambda i: i * v)
-        out = Image.merge(im.mode, tuple(cs))
-        return out
-
+    # ======================= data augmentation =========================
     def distort_image(self, im, hue, sat, val):
         im = im.convert('HSV')
         cs = list(im.split())
@@ -219,82 +203,7 @@ class Linemod(object):
 
         img = self.random_distort_image(sized, hue, saturation, exposure)
 
-        return img, flip, dx,dy,sx,sy
-
-    def fill_truth_detection(self, labpath, w, h, flip, dx, dy, sx, sy):
-        max_boxes = 1
-        label = np.zeros((max_boxes,21))
-        if os.path.getsize(labpath):
-            bs = np.loadtxt(labpath)
-            if bs is None:
-                return label
-            bs = np.reshape(bs, (-1, 21))
-            cc = 0
-            for i in range(bs.shape[0]):
-                x0 = bs[i][1]
-                y0 = bs[i][2]
-                x1 = bs[i][3]
-                y1 = bs[i][4]
-                x2 = bs[i][5]
-                y2 = bs[i][6]
-                x3 = bs[i][7]
-                y3 = bs[i][8]
-                x4 = bs[i][9]
-                y4 = bs[i][10]
-                x5 = bs[i][11]
-                y5 = bs[i][12]
-                x6 = bs[i][13]
-                y6 = bs[i][14]
-                x7 = bs[i][15]
-                y7 = bs[i][16]
-                x8 = bs[i][17]
-                y8 = bs[i][18]
-
-                x0 = min(0.999, max(0, x0 * sx - dx))
-                y0 = min(0.999, max(0, y0 * sy - dy))
-                x1 = min(0.999, max(0, x1 * sx - dx))
-                y1 = min(0.999, max(0, y1 * sy - dy))
-                x2 = min(0.999, max(0, x2 * sx - dx))
-                y2 = min(0.999, max(0, y2 * sy - dy))
-                x3 = min(0.999, max(0, x3 * sx - dx))
-                y3 = min(0.999, max(0, y3 * sy - dy))
-                x4 = min(0.999, max(0, x4 * sx - dx))
-                y4 = min(0.999, max(0, y4 * sy - dy))
-                x5 = min(0.999, max(0, x5 * sx - dx))
-                y5 = min(0.999, max(0, y5 * sy - dy))
-                x6 = min(0.999, max(0, x6 * sx - dx))
-                y6 = min(0.999, max(0, y6 * sy - dy))
-                x7 = min(0.999, max(0, x7 * sx - dx))
-                y7 = min(0.999, max(0, y7 * sy - dy))
-                x8 = min(0.999, max(0, x8 * sx - dx))
-                y8 = min(0.999, max(0, y8 * sy - dy))
-
-                bs[i][1] = x0
-                bs[i][2] = y0
-                bs[i][3] = x1
-                bs[i][4] = y1
-                bs[i][5] = x2
-                bs[i][6] = y2
-                bs[i][7] = x3
-                bs[i][8] = y3
-                bs[i][9] = x4
-                bs[i][10] = y4
-                bs[i][11] = x5
-                bs[i][12] = y5
-                bs[i][13] = x6
-                bs[i][14] = y6
-                bs[i][15] = x7
-                bs[i][16] = y7
-                bs[i][17] = x8
-                bs[i][18] = y8
-
-                label[cc] = bs[i]
-                cc += 1
-                if cc >= 50:
-                    break
-
-        label = np.reshape(label, (-1))
-        return label
+        return img, flip, dx, dy, sx, sy
 
     def change_background(self, img, mask, bg):
         # oh = img.height
@@ -316,7 +225,6 @@ class Linemod(object):
         return out
 
     def load_data_detection(self, imgpath, shape, jitter, hue, saturation, exposure, bgpath):
-        labpath = imgpath.replace('images', 'labels').replace('JPEGImages', 'labels').replace('.jpg', '.txt').replace('.png','.txt')
         maskpath = imgpath.replace('JPEGImages', 'mask').replace('/00', '/').replace('.jpg', '.png')
 
         ## data augmentation
@@ -325,7 +233,10 @@ class Linemod(object):
         bg = Image.open(bgpath).convert('RGB')
 
         img = self.change_background(img, mask, bg)
-        img,flip,dx,dy,sx,sy = self.data_augmentation(img, shape, jitter, hue, saturation, exposure)
+        img, flip, dx, dy, sx, sy = self.data_augmentation(img, shape, jitter, hue, saturation, exposure)
         ow, oh = img.size
-        label = self.fill_truth_detection(labpath, ow, oh, flip, dx, dy, 1./sx, 1./sy)
-        return img,label
+        return img
+
+if __name__ == "__main__":
+    data = Linemod('train', 'cfg'+os.sep+'ape.data')
+    data.next_batches()
