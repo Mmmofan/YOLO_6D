@@ -11,9 +11,6 @@ import tensorflow as tf
 
 import config as cfg
 from utils.utils import (
-    softmax_cross_entropy,
-    conf_mean_squared_error,
-    coord_mean_squared_error,
     confidence9,
     get_max_index,
     corner_confidences9,
@@ -217,19 +214,23 @@ class YOLO6D_net:
             labels: label tensor with shape [nB, nH, nW, 19]
         """
         label_mask   = labels[:, :, :, 0]  # actually, it's not a conf, but a mask...[nB, nH, nW]
-        label_coords = labels[:, :, :, 1:]  # [nB, nH, nW, 18]
+        label_coord = labels[:, :, :, 1:]  # [nB, nH, nW, 18]
         # one object, no class
 
         out_conf   = inputs[:, :, :, 0]  # [nB, nH, nW]
-        out_coords = inputs[:, :, :, 1:]  # [nB, nH, nW, 18]
+        out_coord  = inputs[:, :, :, 1:]  # [nB, nH, nW, 18]
+        out_coord[:2] = tf.nn.sigmoid(out_coord[:2])
 
-        label_conf = self.build_target(label_coords, out_coords)
+        label_conf, conf_mask, label_coords, out_coords = \
+            self.build_target(label_coord, out_coord, label_mask)
 
-        conf_loss  = tf.square(tf.abs(out_conf - label_conf)) * label_mask
+        conf_loss  = tf.square(tf.abs(out_conf - label_conf)) * conf_mask
         conf_loss  = tf.reduce_mean(conf_loss)
-        coord_loss = None
+        coord_loss = tf.square(tf.abs(label_coords - out_coords))
+        coord_loss = tf.reduce_mean(coord_loss)
+        cls_loss   = None
 
-        return conf_loss + coord_loss
+        return conf_loss + coord_loss + cls_loss
 
     def build_target(self, label, out, mask):
         """
@@ -238,5 +239,22 @@ class YOLO6D_net:
             out: output coords. [nB, nH, nW, 18]
             mask: mask tells where is the object, [nB, nH, nW]
         """
-        conf = tf.ones_like(label)
-        return conf
+        nB, nH, nW = mask.get_shape()[0], mask.get_shape()[1], mask.get_shape()[2]
+        # get conf mask
+        conf_mask    = []
+        label_coords = []
+        out_coords   = []
+        for i in range(nB):
+            tmp_conf_mask = tf.ones_like(mask[i]) * self.noobj_scale  # [nH, nW]
+            tmp_conf_mask = mask[i] * self.obj_scale + tmp_conf_mask
+            conf_mask.append(tmp_conf_mask)
+            resp_x, resp_y = get_max_index(mask[i])
+            label_coords.append(label[i][resp_x][resp_y])  # [18, ]
+            out_coords.append(out[i][resp_x][resp_y])  # [18, ]
+
+        conf_mask = tf.convert_to_tensor(conf_mask)  # [nB, nH, nW]
+        label_coords = tf.convert_to_tensor(label_coords)  # [nB, 18]
+        out_coords = tf.convert_to_tensor(out_coords)  # [nB, 18]
+        # get label_conf
+
+        return label_conf, conf_mask, label_coords, out_coords

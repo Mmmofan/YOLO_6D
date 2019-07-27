@@ -64,7 +64,7 @@ class Linemod(object):
                 self.imgname = [x.strip() for x in f.readlines()]  # a list of trianing files
             if self.shuffle:
                 random.shuffle(self.imgname)
-            self.bg_files = get_all_files('VOCdevkit/VOC2012/JPEGImages')
+            self.bg_files = get_all_files('VOCdevkit'+os.sep+'VOC2012'+os.sep+'JPEGImages')
         elif phase == 'test':
             with open(self.testlist, 'r') as f:
                 self.imgname = [x.strip() for x in f.readlines()]
@@ -94,51 +94,34 @@ class Linemod(object):
         return images, labels
 
     def get_label(self, label):
-        # label: [21, ]
-        output = np.zeros([13, 13, 20], np.float32)
+        # label: [nH, nW, 19]
+        output = np.zeros([13, 13, 19], np.float32)
         nW, nH = 13, 13
-        x0  = label[1] * nW
-        y0  = label[2] * nH
-        gx0 = int(x0)
-        gy0 = int(y0)
-        x1  = label[3] * nW
-        y1  = label[4] * nH
-        x2  = label[5] * nW
-        y2  = label[6] * nH
-        x3  = label[7] * nW
-        y3  = label[8] * nH
-        x4  = label[9] * nW
-        y4  = label[10] * nH
-        x5  = label[11] * nW
-        y5  = label[12] * nH
-        x6  = label[13] * nW
-        y6  = label[14] * nH
-        x7  = label[15] * nW
-        y7  = label[16] * nH
-        x8  = label[17] * nW
-        y8  = label[18] * nH
-        cls = label[0]
-
-        output[gx0][gy0][0]  = 1
-        output[gx0][gy0][1]  = x0 - gx0
-        output[gx0][gy0][2]  = y0 - gy0
-        output[gx0][gy0][3]  = x1 - gx0
-        output[gx0][gy0][4]  = y1 - gy0
-        output[gx0][gy0][5]  = x2 - gx0
-        output[gx0][gy0][6]  = y2 - gy0
-        output[gx0][gy0][7]  = x3 - gx0
-        output[gx0][gy0][8]  = y3 - gy0
-        output[gx0][gy0][9]  = x4 - gx0
-        output[gx0][gy0][10] = y4 - gy0
-        output[gx0][gy0][11] = x5 - gx0
-        output[gx0][gy0][12] = y5 - gy0
-        output[gx0][gy0][13] = x6 - gx0
-        output[gx0][gy0][14] = y6 - gy0
-        output[gx0][gy0][15] = x7 - gx0
-        output[gx0][gy0][16] = y7 - gy0
-        output[gx0][gy0][17] = x8 - gx0
-        output[gx0][gy0][18] = y8 - gy0
-        output[gx0][gy0][19] = cls
+        label_file_path = label.replace('JPEGImages', 'labels').replace('.jpg', '.txt')
+        with open(label_file_path, 'r') as fh:
+            gt_label = fh.readline().split()
+            gt_label = [float(i) for i in gt_label][1:-2] # 18 numbers
+        center_x = int(gt_label[0] * nH)
+        center_y = int(gt_label[1] * nW)
+        output[center_x, center_y, 0] =  1
+        output[center_x, center_y, 1] =  gt_label[0] *nH - center_x
+        output[center_x, center_y, 2] =  gt_label[1] *nW - center_y
+        output[center_x, center_y, 3] =  gt_label[2] *nH - center_x
+        output[center_x, center_y, 4] =  gt_label[3] *nW - center_y
+        output[center_x, center_y, 5] =  gt_label[4] *nH - center_x
+        output[center_x, center_y, 6] =  gt_label[5] *nW - center_y
+        output[center_x, center_y, 7] =  gt_label[6] *nH - center_x
+        output[center_x, center_y, 8] =  gt_label[7] *nW - center_y
+        output[center_x, center_y, 9] =  gt_label[8] *nH - center_x
+        output[center_x, center_y, 10] =  gt_label[9] *nW - center_y
+        output[center_x, center_y, 11] =  gt_label[10] *nH - center_x
+        output[center_x, center_y, 12] =  gt_label[11] *nW - center_y
+        output[center_x, center_y, 13] =  gt_label[12] *nH - center_x
+        output[center_x, center_y, 14] =  gt_label[13] *nW - center_y
+        output[center_x, center_y, 15] =  gt_label[14] *nH - center_x
+        output[center_x, center_y, 16] =  gt_label[15] *nW - center_y
+        output[center_x, center_y, 17] =  gt_label[16] *nH - center_x
+        output[center_x, center_y, 18] =  gt_label[17] *nW - center_y
 
         return output
 
