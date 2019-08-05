@@ -68,6 +68,7 @@ class Linemod(object):
         elif phase == 'test':
             with open(self.testlist, 'r') as f:
                 self.imgname = [x.strip() for x in f.readlines()]
+                self.gt_labels = [os.path.join(os.path.split(os.path.split(x)[0])[0], 'labels') + os.sep + os.path.split(x)[1][:-4] + '.txt' for x in self.imgname]
         else:
             raise Exception('\n   Wrong phase...\n   Try again...')
 

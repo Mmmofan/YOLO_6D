@@ -20,12 +20,12 @@ import os
 import numpy as np
 import tensorflow as tf
 
-import yolo.config as cfg
+import config as cfg  # 改成自己config文件的路劲
 from linemod import Linemod
 from utils.MeshPly import MeshPly
 from utils.timer import Timer
 from utils.utils import *
-from yolo.yolo_6d_net import YOLO6D_net
+from yolo_6d import YOLO6D_net # 改成自己网络文件的名字
 
 class Detector(object):
 
@@ -53,18 +53,21 @@ class Detector(object):
         all_labels = self.data.gt_labels
         assert(len(all_images)==len(all_labels))
         # for i in range(len(all_images)):
-        for i in range(10):
+        image_tmp = []
+        for i in range(4):
             image_path   = all_images[i]
             gt_label     = all_labels[i]
             image, label = self.data_read(image_path, gt_label)  # image: [416, 416, 3], label: [13, 13, 32]
             w, h, d      = image.shape[0], image.shape[1], image.shape[2]
             input_image  = np.reshape(image, [1, w, h, d])
-            feed_dict    = {self.yolo.input_images: input_image}
-            output       = self.sess.run(self.yolo.logit, feed_dict=feed_dict)  # 4-D [1, 13, 13, 32]
-            self.post_process(output, image_path, label, i)
+            image_tmp.append(input_image)
+        image_feed = np.concatenate([x for x in image_tmp], 0)
+        feed_dict    = {self.yolo.input_images: image_feed}
+        output       = self.sess.run(self.yolo.logit, feed_dict=feed_dict)  # 4-D [1, 13, 13, 32]
+        self.post_process(output, image_path, label)
         return
 
-    def post_process(self, output, image_path, label, number):
+    def post_process(self, output, image_path, label):
         coords = output[:, :, :, 1:19] # [batch, 13, 13, 18]
         class_prob = output[:, :, :, 19:]  # [batch, 13, 13, 13]
         confidence = output[:, :, :, 1]  # [batch, 13, 13]
@@ -81,10 +84,10 @@ class Detector(object):
             max_conf = np.max(conf)
             idxi, idxj = np.where(conf == max_conf)
             idxi, idxj = idxi[0], idxj[0]
-            classes = class_prob[i, idxi, idxj, :]
-            classes = softmax(classes)
-            max_class_val= np.max(classes)
-            class_id = np.where(classes==max_class_val)
+            # classes = class_prob[i, idxi, idxj, :]
+            # classes = softmax(classes)
+            # max_class_val= np.max(classes)
+            # class_id = np.where(classes==max_class_val)
             coord = coords[i, idxi, idxj, :]
             xc = (coord[0]  + idxi) /13.
             yc = (coord[1]  + idxj) /13.
@@ -105,7 +108,7 @@ class Detector(object):
             x8 = (coord[16] + idxi) /13.
             y8 = (coord[17] + idxj) /13.
             box = [xc*640.,yc*480.,x1*640.,y1*480.,x2*640.,y2*480.,x3*640.,y3*480.,x4*640.,y4*480.,
-                    x5*640.,y5*480.,x6*640.,y6*480.,x7*640.,y7*480.,x8*640.,y8*480.,class_id]
+                    x5*640.,y5*480.,x6*640.,y6*480.,x7*640.,y7*480.,x8*640.,y8*480.]
             boxes.append(box)
 
             resp = np.max(response)
@@ -136,7 +139,7 @@ class Detector(object):
 
         assert(len(boxes)==len(gt))
         for idx in range(len(boxes)):
-            self.draw(boxes[idx], gt[idx], image_path, number)
+            self.draw(boxes[idx], gt[idx], image_path, idx)
 
         print('image showed')
 
@@ -146,9 +149,10 @@ class Detector(object):
                 int(box[0]), int(box[1]), int(box[2]), int(box[3]), int(box[4]), int(box[5]), \
                 int(box[6]), int(box[7]), int(box[8]), int(box[9]), int(box[10]), int(box[11]),\
                 int(box[12]), int(box[13]), int(box[14]), int(box[15]), int(box[16]), int(box[17])
-        class_id = box[18][0][0]
-        assert(class_id>=0 and class_id<=13)
-        name = 'draw_' + str(number) + self.categories[class_id] + '.jpg'
+        # class_id = box[18][0][0]
+        # assert(class_id>=0 and class_id<=13)
+        # name = 'draw_' + str(number) + self.categories[class_id] + '.jpg'
+        name = 'draw_' + str(number) + 'cam.jpg'
 
         txc, tyc, tx1, ty1, tx2, ty2, tx3, ty3, tx4, ty4, tx5, ty5, tx6, ty6, tx7, ty7, tx8, ty8 = \
                 int(gt[0]), int(gt[1]), int(gt[2]), int(gt[3]), int(gt[4]), int(gt[5]), \
@@ -223,27 +227,29 @@ class Detector(object):
         Return:
             A 3-D tensor with shape [13, 13, 19 + num_classes]
         """
+        with open(gt_labels) as f:
+            gt_label = [float(x) for x in f.readline().split()]
         classes = np.zeros((13, 13, self.num_classes), np.float32)
 
-        gt_label = gt_labels[0]
-        gt_xc    = gt_labels[1]  * 13.0
-        gt_yc    = gt_labels[2]  * 13.0
-        gt_x0    = gt_labels[3]  * 13.0
-        gt_y0    = gt_labels[4]  * 13.0
-        gt_x1    = gt_labels[5]  * 13.0
-        gt_y1    = gt_labels[6]  * 13.0
-        gt_x2    = gt_labels[7]  * 13.0
-        gt_y2    = gt_labels[8]  * 13.0
-        gt_x3    = gt_labels[9]  * 13.0
-        gt_y3    = gt_labels[10] * 13.0
-        gt_x4    = gt_labels[11] * 13.0
-        gt_y4    = gt_labels[12] * 13.0
-        gt_x5    = gt_labels[13] * 13.0
-        gt_y5    = gt_labels[14] * 13.0
-        gt_x6    = gt_labels[15] * 13.0
-        gt_y6    = gt_labels[16] * 13.0
-        gt_x7    = gt_labels[17] * 13.0
-        gt_y7    = gt_labels[18] * 13.0
+        gt_class = gt_label[0]
+        gt_xc    = gt_label[1]  * 13.0
+        gt_yc    = gt_label[2]  * 13.0
+        gt_x0    = gt_label[3]  * 13.0
+        gt_y0    = gt_label[4]  * 13.0
+        gt_x1    = gt_label[5]  * 13.0
+        gt_y1    = gt_label[6]  * 13.0
+        gt_x2    = gt_label[7]  * 13.0
+        gt_y2    = gt_label[8]  * 13.0
+        gt_x3    = gt_label[9]  * 13.0
+        gt_y3    = gt_label[10] * 13.0
+        gt_x4    = gt_label[11] * 13.0
+        gt_y4    = gt_label[12] * 13.0
+        gt_x5    = gt_label[13] * 13.0
+        gt_y5    = gt_label[14] * 13.0
+        gt_x6    = gt_label[15] * 13.0
+        gt_y6    = gt_label[16] * 13.0
+        gt_x7    = gt_label[17] * 13.0
+        gt_y7    = gt_label[18] * 13.0
 
         
         coords = [0.0, gt_xc, gt_yc, gt_x0, gt_y0, gt_x1, gt_y1, gt_x2, gt_y2, gt_x3, gt_y3,
@@ -260,7 +266,7 @@ class Detector(object):
         coords[response_x, response_y, 0] = 1.0
 
         # set label
-        classes[response_x, response_y, int(gt_label)] = 1  # [13, 13, classes]
+        classes[response_x, response_y, int(gt_class)] = 1  # [13, 13, classes]
 
         labels = np.concatenate([coords, classes], 2)
 
@@ -269,8 +275,8 @@ class Detector(object):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--datacfg', default='cfg/ape.data', type=str)
-    parser.add_argument('--weights', default='yolo_6d.ckpt', type=str)
+    parser.add_argument('--datacfg', default='cfg/cam.data', type=str)
+    parser.add_argument('--weights', default='yolo_best.ckpt', type=str)
     parser.add_argument('--gpu', default= '', type=str)
     parser.add_argument('--data_dir', default='data', type=str)
     parser.add_argument('--weight_dir', default='weights', type=str)

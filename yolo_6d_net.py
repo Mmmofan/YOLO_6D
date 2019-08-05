@@ -118,7 +118,7 @@ class YOLO6D_net:
         self.weights['w3_2'] = tf.Variable(tf.random_normal([1, 1, 128, 64], stddev=0.01), 'w3_2')
         self.biases['b3_2']  = tf.Variable(tf.zeros([64]), 'b3_2')
         self.weights['w3_3'] = tf.Variable(tf.random_normal([3, 3, 64, 128], stddev=0.01), 'w3_3')
-        self.biases['w3_3']  = tf.Variable(tf.zeros([128]), 'b3_3')
+        self.biases['b3_3']  = tf.Variable(tf.zeros([128]), 'b3_3')
         # pool
         self.weights['w4_1'] = tf.Variable(tf.random_normal([3, 3, 128, 256], stddev=0.01), 'w4_1')
         self.biases['b4_1']  = tf.Variable(tf.zeros([256]), 'b4_1')
